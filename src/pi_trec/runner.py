@@ -25,7 +25,6 @@ from pi_trec.config import (
 )
 from pi_trec.jsonl import append_jsonl, completed_task_ids, read_jsonl
 
-# Re-exported from pi_trec.config so existing imports keep working.
 __all__ = [
     "DEFAULT_MAX_CONCURRENCY",
     "DEFAULT_MODEL",

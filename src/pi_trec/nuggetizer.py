@@ -9,8 +9,6 @@ from pathlib import Path
 from typing import Any
 
 from pi_trec.config import (
-    DEFAULT_MAX_TRIALS,
-    DEFAULT_WINDOW_SIZE,
     LocalAgentConfig,
     MaterializeNuggetAgenticCreateConfig,
     MaterializeNuggetAssignConfig,
@@ -36,16 +34,9 @@ from pi_trec.prompts import (
 )
 from pi_trec.runner import run_prompt, select_rows
 
-# DEFAULT_WINDOW_SIZE / DEFAULT_MAX_TRIALS now live in pi_trec.config and are
-# re-exported above so existing imports (and the CLI) keep working.
-
 
 def iter_window_bounds(total: int, window_size: int) -> list[tuple[int, int]]:
-    """`[start, end)` windows over `total` items, at most `window_size` per window.
-
-    Mirrors the reference `_iter_window_bounds`: the creator slides over
-    documents, the scorer and assigner slide over nuggets, one window per call.
-    """
+    """`[start, end)` windows over `total` items, at most `window_size` each."""
     if window_size <= 0:
         raise ValueError(f"window_size must be a positive integer, got {window_size}")
     return [(start, min(start + window_size, total)) for start in range(0, total, window_size)]
@@ -151,12 +142,7 @@ def iter_create_tasks(records: list[dict[str, Any]], *, creator_max_nuggets: int
 
 
 def iter_create_inputs(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Per-record creation inputs for the windowed runtime (raw candidates kept).
-
-    Unlike `iter_create_tasks` (which renders a single full-context prompt for
-    materialization/debugging), the runtime windows over `candidates`, so it
-    keeps the raw candidate list rather than a pre-rendered context.
-    """
+    """Per-record creation inputs for the windowed runtime (raw candidates kept)."""
     inputs: list[dict[str, Any]] = []
     for index, record in enumerate(records, start=1):
         qid, query = normalize_query(record.get("query"))
@@ -341,15 +327,8 @@ async def _generate_labels(
 ) -> dict[str, Any]:
     """Run a label-list prompt, retrying on a parse miss.
 
-    Mirrors the reference temperature-bump retry loop. Through the Pi CLI a retry
-    is a plain re-run (the default reasoning model ignores temperature, so no
-    temperature is plumbed). Returns ``{"labels", "result", "status"}`` where
-    status is one of:
-
-    - ``"parsed"``: a list was parsed (matching ``expected_length`` when given);
-    - ``"parse_exhausted"``: every trial completed but none parsed;
-    - ``"provider_error"``: a trial failed to complete (no parse-retry, matching
-      the reference, which lets provider errors short-circuit the parse loop).
+    Returns ``{"labels", "result", "status"}`` with status ``parsed``,
+    ``parse_exhausted``, or ``provider_error``.
     """
     last: dict[str, Any] | None = None
     for trial in range(max(1, max_trials)):
@@ -407,7 +386,6 @@ async def _create_windowed(
         traces.append(outcome["result"])
         if outcome["status"] == "parsed":
             nuggets = outcome["labels"][:max_nuggets]
-        # parse_exhausted / provider_error: keep the nuggets gathered so far.
     return nuggets, traces
 
 
@@ -444,7 +422,7 @@ async def _score_windowed(
             labels = [label.strip().lower() for label in outcome["labels"]]
         elif outcome["status"] == "parse_exhausted":
             labels = ["okay"] * len(window)
-        else:  # provider_error: drop this window (reference scorer returns []).
+        else:
             continue
         scored.extend(zip(window, labels, strict=False))
     return scored, traces
@@ -487,7 +465,7 @@ async def _assign_windowed(
         traces.append(outcome["result"])
         if outcome["status"] == "parsed":
             labels = [label.strip().lower() for label in outcome["labels"]]
-        else:  # parse_exhausted / provider_error: mark the window failed.
+        else:
             labels = ["failed"] * len(window)
         assigned.extend(zip(window, labels, strict=False))
     return assigned, traces
@@ -611,9 +589,6 @@ async def _run_agentic_create_task(
             include_trace=include_trace,
         )
     nuggets = nuggets[:max_nuggets]
-    # The agentic creator is a single tool-using session (it does its own
-    # retrieval), but scoring its final nugget list is windowed, matching the
-    # reference scorer.
     scored, scorer_traces = await _score_windowed(
         base_task_id=task["task_id"],
         qid=metadata["qid"],

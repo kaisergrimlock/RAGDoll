@@ -1,11 +1,4 @@
-"""Command-line interface for pi-trec.
-
-Every subcommand builds a typed config object (see :mod:`pi_trec.config`). Values
-come from dataclass defaults, then an optional ``--config`` YAML file, then any
-explicit CLI flags (later sources win). Flags use ``argparse.SUPPRESS`` defaults
-so the parsed namespace contains only what the user actually passed, which keeps
-the YAML/CLI merge unambiguous.
-"""
+"""Command-line interface for pi-trec."""
 
 from __future__ import annotations
 
@@ -16,7 +9,7 @@ import inspect
 from argparse import SUPPRESS
 from pathlib import Path
 
-from pi_trec import nuggetizer, pyserini_wrapper, support, topics, umbrela
+from pi_trec import nuggetizer, pyserini_wrapper, support, umbrela
 from pi_trec.config import (
     BaseConfig,
     LocalAgentRunConfig,
@@ -31,14 +24,9 @@ from pi_trec.config import (
     NuggetCreateConfig,
     PyseriniServeConfig,
     SupportJudgeConfig,
-    TopicsCategoryTaskConfig,
-    TopicsGenerateConfig,
-    TopicsMaterializeConfig,
-    TopicsParseCategoriesConfig,
-    TopicsParseConfig,
-    TopicsReportConfig,
     UmbrelaJudgeConfig,
     load_config_file,
+    load_env_file,
 )
 from pi_trec.runner import run_task_rows
 
@@ -151,46 +139,6 @@ def build_parser() -> argparse.ArgumentParser:
     add_runner_args(support_judge)
     support_judge.add_argument("--include-prompt", action="store_true", default=SUPPRESS)
     finish(support_judge, config_cls=SupportJudgeConfig, handler=support.judge)
-
-    topics_parser = subparsers.add_parser("topics", help="Run KARL-style topic generation through Pi.")
-    topics_subparsers = topics_parser.add_subparsers(dest="topics_command", required=True)
-
-    topics_materialize = topics_subparsers.add_parser("materialize", help="Materialize Pine-compatible topic-generation tasks.")
-    add_topics_materialize_args(topics_materialize)
-    finish(topics_materialize, config_cls=TopicsMaterializeConfig, handler=topics.materialize)
-
-    topics_generate = topics_subparsers.add_parser("generate", help="Run topic-generation tasks through Pi.")
-    add_runner_args(topics_generate)
-    finish(topics_generate, config_cls=TopicsGenerateConfig, handler=topics.generate)
-
-    topics_parse = topics_subparsers.add_parser("parse", help="Parse topic-generation results into candidates.")
-    topics_parse.add_argument("--input-file", type=Path, default=SUPPRESS)
-    topics_parse.add_argument("--output-file", type=Path, default=SUPPRESS)
-    topics_parse.add_argument("--rejected-output", type=Path, default=SUPPRESS)
-    topics_parse.add_argument("--summary-output", type=Path, default=SUPPRESS)
-    topics_parse.add_argument("--candidates-per-episode", type=int, default=SUPPRESS)
-    topics_parse.add_argument("--existing-prompt-file", action="append", default=SUPPRESS, type=Path)
-    topics_parse.add_argument("--skip-existing-dedup", action="store_true", default=SUPPRESS)
-    finish(topics_parse, config_cls=TopicsParseConfig, handler=topics.parse)
-
-    topics_report = topics_subparsers.add_parser("report", help="Report topic-generation candidate statistics.")
-    topics_report.add_argument("--input-file", type=Path, default=SUPPRESS)
-    topics_report.add_argument("--summary-input", type=Path, default=SUPPRESS)
-    topics_report.add_argument("--output-file", type=Path, default=SUPPRESS)
-    finish(topics_report, config_cls=TopicsReportConfig, handler=topics.report)
-
-    topics_category_task = topics_subparsers.add_parser("category-task", help="Build the ResearchRubrics category task.")
-    topics_category_task.add_argument("--researchrubrics-path", type=Path, default=SUPPRESS)
-    topics_category_task.add_argument("--output-file", type=Path, default=SUPPRESS)
-    topics_category_task.add_argument("--category-count", type=int, default=SUPPRESS)
-    finish(topics_category_task, config_cls=TopicsCategoryTaskConfig, handler=topics.category_task)
-
-    topics_parse_categories = topics_subparsers.add_parser("parse-categories", help="Parse ResearchRubrics category results.")
-    topics_parse_categories.add_argument("--input-file", type=Path, default=SUPPRESS)
-    topics_parse_categories.add_argument("--output-file", type=Path, default=SUPPRESS)
-    topics_parse_categories.add_argument("--summary-output", type=Path, default=SUPPRESS)
-    topics_parse_categories.add_argument("--category-count", type=int, default=SUPPRESS)
-    finish(topics_parse_categories, config_cls=TopicsParseCategoriesConfig, handler=topics.parse_categories)
     return parser
 
 
@@ -203,7 +151,7 @@ def add_config_arg(parser: argparse.ArgumentParser) -> None:
 
 
 def finish(parser: argparse.ArgumentParser, *, config_cls: type[BaseConfig], handler) -> None:
-    """Attach the shared ``--config`` flag and bind the config class + handler."""
+    """Add ``--config`` and bind the config class and handler to the subparser."""
     add_config_arg(parser)
     parser.set_defaults(config_cls=config_cls, handler=handler)
 
@@ -264,23 +212,6 @@ def add_assign_input_args(parser: argparse.ArgumentParser) -> None:
     group.add_argument("--input-json", default=SUPPRESS)
 
 
-def add_topics_materialize_args(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--episodes", type=int, default=SUPPRESS)
-    parser.add_argument("--candidates-per-episode", type=int, default=SUPPRESS)
-    parser.add_argument("--max-search-calls", type=int, default=SUPPRESS)
-    parser.add_argument("--search-topk", type=int, default=SUPPRESS)
-    parser.add_argument("--min-unique-cited-docids", type=int, default=SUPPRESS)
-    parser.add_argument("--min-search-calls-per-candidate", type=int, default=SUPPRESS)
-    parser.add_argument("--icl-source", choices=["researchrubrics", "fixed"], default=SUPPRESS)
-    parser.add_argument("--icl-examples", type=int, default=SUPPRESS)
-    parser.add_argument("--icl-seed", type=int, default=SUPPRESS)
-    parser.add_argument("--informal-style-probability", type=float, default=SUPPRESS)
-    parser.add_argument("--researchrubrics-path", type=Path, default=SUPPRESS)
-    parser.add_argument("--topic-categories", type=Path, default=SUPPRESS)
-    parser.add_argument("--topic-category-seed", type=int, default=SUPPRESS)
-    parser.add_argument("--output-file", type=Path, default=SUPPRESS)
-
-
 def parse_key_value(text: str) -> tuple[str, str]:
     if "=" not in text:
         raise argparse.ArgumentTypeError("expected KEY=VALUE")
@@ -300,6 +231,7 @@ def build_config(args: argparse.Namespace) -> BaseConfig:
 
 
 def main() -> None:
+    load_env_file()
     parser = build_parser()
     args = parser.parse_args()
     config = build_config(args)

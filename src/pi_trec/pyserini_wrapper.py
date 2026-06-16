@@ -14,8 +14,6 @@ from urllib.request import Request, urlopen
 
 from pi_trec.config import PyseriniServeConfig, PyseriniWrapperConfig
 
-# PyseriniWrapperConfig now lives in pi_trec.config and is re-exported here so
-# existing imports keep working.
 __all__ = [
     "PyseriniServeConfig",
     "PyseriniWrapperConfig",
@@ -264,7 +262,7 @@ def make_pyserini_wrapper_handler(config: PyseriniWrapperConfig) -> type[BaseHTT
                 _json_response(self, HTTPStatus.NOT_FOUND, {"error": "not found"})
             except ValueError as exc:
                 _json_response(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
-            except Exception as exc:  # pragma: no cover - defensive server boundary
+            except Exception as exc:
                 _json_response(self, HTTPStatus.BAD_GATEWAY, {"error": str(exc)})
 
         def log_message(self, format: str, *args: Any) -> None:
