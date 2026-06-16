@@ -33,7 +33,7 @@ The rendered prompt is written to a temporary UTF-8 text file and passed to Pi w
 The default system prompt is explicitly set to the empty string so the model-facing instruction is the evaluator prompt rather than Pi's coding-assistant system prompt.
 Nuggetizer is the exception because the source Nuggetizer templates define real `system_message` values. For Nuggetizer create, score, and assign commands, Pi receives the copied Nuggetizer system message through `--system-prompt`, and `prompt.txt` contains only the copied `prefix_user` prompt. UMBRELA and support evaluation use an empty system prompt because their source prompt templates/reference script do not define a non-empty system role.
 
-Useful shared flags include `--agent-binary`, `--model`, `--thinking`, `--temperature`, `--max-concurrency`, `--timeout-seconds`, `--raw-events-dir`, `--limit`, `--resume`, `--overwrite`, `--dry-run` (select and count tasks without calling Pi), `--cache-dir` (reuse identical prompt results, with a 3-hour TTL), and `-v`/`-q` for logging. `create`, `assign`, and `agentic-create` run cells/topics concurrently (bounded by `--max-concurrency`).
+Useful shared flags include `--agent-binary`, `--model`, `--thinking`, `--temperature`, `--max-concurrency`, `--timeout-seconds`, `--raw-events-dir`, `--limit`, `--resume`, `--overwrite`, `--dry-run` (select and count tasks without calling Pi), `--cache-dir` (reuse identical prompt results, with a 3-hour TTL; defaults to the gitignored `.cache/pi-trec`), `--no-cache` (disable caching for a run so every task hits inference), and `-v`/`-q` for logging. `create`, `assign`, and `agentic-create` run cells/topics concurrently (bounded by `--max-concurrency`).
 
 ## Configuration (CLI or YAML)
 

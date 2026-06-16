@@ -16,6 +16,7 @@ from pi_trec.config import (
     PyseriniWrapperConfig,
     RunConfig,
     UmbrelaJudgeConfig,
+    default_cache_dir,
     load_config_file,
     load_env_file,
 )
@@ -34,6 +35,7 @@ def test_defaults_match_legacy_values() -> None:
     assert run.timeout_seconds == 900.0
     assert run.max_concurrency == 8
     assert run.seed == 13
+    assert run.cache_dir == default_cache_dir()
     assert run.resume is False and run.overwrite is False and run.shuffle is False
 
     nugget = NuggetCreateConfig()
@@ -43,6 +45,21 @@ def test_defaults_match_legacy_values() -> None:
     assert nugget.include_trace is False
 
     assert UmbrelaJudgeConfig().prompt_type == "bing"
+
+
+def test_no_cache_overrides_default_and_configured_dir(tmp_path: Path) -> None:
+    import argparse
+
+    from pi_trec.cli import build_config
+
+    base = dict(config_cls=RunConfig, input_file="in.jsonl", output_file="out.jsonl")
+    assert build_config(argparse.Namespace(**base)).cache_dir == default_cache_dir()
+    assert build_config(argparse.Namespace(**base, cache_dir=Path("/tmp/c"))).cache_dir == Path("/tmp/c")
+
+    cfg = tmp_path / "c.yaml"
+    cfg.write_text("cache_dir: /tmp/from-yaml\n", encoding="utf-8")
+    assert build_config(argparse.Namespace(**base, config=cfg)).cache_dir == Path("/tmp/from-yaml")
+    assert build_config(argparse.Namespace(**base, config=cfg, no_cache=True)).cache_dir is None
 
 
 def test_from_mapping_coerces_paths_and_extension_env() -> None:

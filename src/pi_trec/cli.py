@@ -291,7 +291,19 @@ def add_runner_args(parser: argparse.ArgumentParser, *, include_input_file: bool
         default=SUPPRESS,
         help="Sampling temperature. Unset by default (required for gpt-5* models).",
     )
-    parser.add_argument("--cache-dir", type=Path, default=SUPPRESS, help="Reuse identical prompt results from this dir.")
+    cache_group = parser.add_mutually_exclusive_group()
+    cache_group.add_argument(
+        "--cache-dir",
+        type=Path,
+        default=SUPPRESS,
+        help="Reuse identical prompt results from this dir. Defaults to .cache/pi-trec.",
+    )
+    cache_group.add_argument(
+        "--no-cache",
+        action="store_true",
+        default=SUPPRESS,
+        help="Disable caching for this run so every task hits inference.",
+    )
     parser.add_argument("--resume", action="store_true", default=SUPPRESS)
     parser.add_argument("--overwrite", action="store_true", default=SUPPRESS)
     parser.add_argument(
@@ -348,6 +360,8 @@ def build_config(args: argparse.Namespace) -> BaseConfig:
     file_data = load_config_file(args.config) if getattr(args, "config", None) else None
     field_names = {field.name for field in dataclasses.fields(config_cls)}
     cli_overrides = {key: value for key, value in vars(args).items() if key in field_names}
+    if getattr(args, "no_cache", False):
+        cli_overrides["cache_dir"] = None
     return config_cls.from_sources(file_data=file_data, cli_overrides=cli_overrides)
 
 

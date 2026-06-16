@@ -22,6 +22,15 @@ DEFAULT_TIMEOUT_SECONDS = 900.0
 DEFAULT_MAX_CONCURRENCY = 8
 DEFAULT_SYSTEM_PROMPT = ""
 DEFAULT_SEED = 13
+# Caching is on by default at this gitignored path; disable per-run with --no-cache.
+# Override the location with PI_TREC_CACHE_DIR (tests point it at a temp dir).
+DEFAULT_CACHE_DIR = Path(".cache/pi-trec")
+CACHE_DIR_ENV = "PI_TREC_CACHE_DIR"
+
+
+def default_cache_dir() -> Path:
+    override = os.environ.get(CACHE_DIR_ENV)
+    return Path(override) if override else DEFAULT_CACHE_DIR
 
 DEFAULT_WINDOW_SIZE = 10
 DEFAULT_MAX_TRIALS = 4
@@ -218,7 +227,7 @@ class RunConfig(BaseConfig):
     output_file: Path | None = None
     failed_output: Path | None = None
     raw_events_dir: Path | None = None
-    cache_dir: Path | None = None
+    cache_dir: Path | None = dataclasses.field(default_factory=default_cache_dir)
     agent_binary: str = "pi"
     provider: str = DEFAULT_PROVIDER
     model: str = DEFAULT_MODEL
