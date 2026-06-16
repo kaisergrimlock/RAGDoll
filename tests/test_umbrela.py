@@ -1,8 +1,7 @@
 import json
 from pathlib import Path
 
-from pi_trec.prompts import parse_umbrela_judgment, render_umbrela_prompt
-from pi_trec.umbrela import iter_prompt_tasks
+from pi_trec.umbrela import iter_prompt_tasks, parse_umbrela_judgment, render_umbrela_prompt
 
 
 def _source_prompt(prompt_type: str) -> str:

@@ -8,12 +8,20 @@ dependencies = [
     "pyyaml>=6",
 ]
 
+[project.optional-dependencies]
+viz = [
+    "matplotlib>=3.7",
+]
+
 [project.scripts]
 pi-trec = "pi_trec.cli:main"
 
 [dependency-groups]
 dev = [
     "pytest>=8.0",
+    "matplotlib>=3.7",
+    "ruff>=0.6",
+    "mypy>=1.10",
 ]
 
 [build-system]
@@ -23,4 +31,19 @@ build-backend = "hatchling.build"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+extend-exclude = ["tests/fixtures"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+# Line length is left to judgment/formatting, not enforced as a lint failure.
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+warn_redundant_casts = true
 

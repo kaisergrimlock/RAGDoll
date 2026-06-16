@@ -24,14 +24,16 @@ All evaluator commands run prompts through:
 pi --no-tools --no-session --no-skills --no-context-files \
   --no-extensions --no-prompt-templates --no-themes \
   --system-prompt "" --mode json \
-  --model openai-codex/gpt-5.5 --thinking medium @/tmp/.../prompt.txt
+  --model openai-codex/gpt-5.5 --thinking minimal @/tmp/.../prompt.txt
 ```
+
+`--thinking` defaults to `auto`, which resolves per model: `minimal` for `gpt-5*` (deterministic and fast) and `medium` otherwise. Pass an explicit level to override. `--temperature` is left unset by default (required for `gpt-5*`); set it only for models that accept it.
 
 The rendered prompt is written to a temporary UTF-8 text file and passed to Pi with its `@file` initial-message syntax. This avoids OS command-line argument length limits for long RAG prompts.
 The default system prompt is explicitly set to the empty string so the model-facing instruction is the evaluator prompt rather than Pi's coding-assistant system prompt.
 Nuggetizer is the exception because the source Nuggetizer templates define real `system_message` values. For Nuggetizer create, score, and assign commands, Pi receives the copied Nuggetizer system message through `--system-prompt`, and `prompt.txt` contains only the copied `prefix_user` prompt. UMBRELA and support evaluation use an empty system prompt because their source prompt templates/reference script do not define a non-empty system role.
 
-Useful shared flags include `--agent-binary`, `--model`, `--thinking`, `--max-concurrency`, `--timeout-seconds`, `--raw-events-dir`, `--limit`, and `--overwrite`.
+Useful shared flags include `--agent-binary`, `--model`, `--thinking`, `--temperature`, `--max-concurrency`, `--timeout-seconds`, `--raw-events-dir`, `--limit`, `--resume`, `--overwrite`, `--dry-run` (select and count tasks without calling Pi), `--cache-dir` (reuse identical prompt results, with a 3-hour TTL), and `-v`/`-q` for logging. `create`, `assign`, and `agentic-create` run cells/topics concurrently (bounded by `--max-concurrency`).
 
 ## Configuration (CLI or YAML)
 
@@ -157,6 +159,57 @@ uv run pi-trec materialize nugget-agentic-create \
   --max-nuggets 30
 ```
 
+### Score an assignment
+
+`nuggetizer metrics` scores an assignment file (rows with `qid`, `run_id`, and `nuggets` carrying `importance` + `assignment`) into per-cell, per-run, and label-distribution CSVs. Pass `--reference` (a gold/reference assignment) to also get run-level and topic-run Kendall `tau`. Coverage follows the reference semantics: `support`=1.0, `partial_support`=0.5 (non-strict only), vital metrics restricted to vital nuggets.
+
+```bash
+uv run pi-trec nuggetizer metrics \
+  --input-file results/assignments.jsonl \
+  --output-dir results/metrics \
+  --reference data/TREC2024/assignment-nist5/human_gold.jsonl
+```
+
+### End-to-end eval
+
+`nuggetizer eval` chains create → assign → metrics. Give it either `--create-input` (generate nuggets from candidates, E2E) or `--nuggets-file` (assignment-only, fixed nuggets), plus `--answers-file` and an output dir; add `--gold` to score against a reference.
+
+```bash
+# Assignment-only (fixed nuggets):
+uv run pi-trec nuggetizer eval \
+  --nuggets-file data/TREC2024/assignment-nist5/nuggets.jsonl \
+  --answers-file data/TREC2024/assignment-nist5/answers.jsonl \
+  --gold data/TREC2024/assignment-nist5/human_gold.jsonl \
+  --output-dir results/TREC2024/assignment-nist5/gpt-5.5 \
+  --model openai-codex/gpt-5.5 --thinking minimal
+
+# End-to-end (UMBRELA -> create -> assign):
+uv run pi-trec nuggetizer eval \
+  --create-input data/TREC2024/e2e-umbrela/create_input.jsonl \
+  --answers-file data/TREC2024/e2e-umbrela/answers.jsonl \
+  --gold data/TREC2024/e2e-umbrela/human_gold.jsonl \
+  --output-dir results/TREC2024/e2e-umbrela/gpt-5.5
+```
+
+### TREC adapters
+
+Convert a TREC RAG answer run into the `answers` schema, and join `answers` + `nuggets` (by `qid`) into assign payloads for batch assignment:
+
+```bash
+uv run pi-trec materialize trec-answers --input-file run.jsonl --output-file answers.jsonl
+uv run pi-trec materialize assign-inputs \
+  --answers-file answers.jsonl --nuggets-file nuggets.jsonl --output-file assign_inputs.jsonl
+```
+
+### Operate: doctor, validate, cost
+
+```bash
+uv run pi-trec doctor --probe              # check pi binary, agent auth, and a model
+uv run pi-trec validate --input-file data/TREC2024/assignment-nist5/nuggets.jsonl
+uv run pi-trec cost --raw-events-dir results/metrics/../raw-events \
+  --input-price 0.25 --output-price 2.0    # USD per 1M tokens (optional)
+```
+
 ## Support Evaluation
 
 Run support judgment on pre-resolved statement/citation pairs:
@@ -170,3 +223,19 @@ uv run pi-trec support judge \
 ```
 
 The support prompt is copied exactly from `trec2024-rag/support_eval/code/support_evaluation_individual_gpt4o.py`, associated with the SIGIR 2025 support evaluation paper: <https://doi.org/10.1145/3726302.3730165>.
+
+## Data
+
+Evaluation inputs and gold for the Assignment and E2E tasks live under `data/`, organized by year (`data/TREC2024/`, `data/TREC2025/`). See `data/README.md` for per-dataset schemas, cell counts, gold type (human vs reference), and provenance.
+
+## Development
+
+```bash
+uv sync --group dev      # install dev tools (pytest, ruff, mypy)
+uv run pytest            # tests
+uv run ruff check src tests
+uv run mypy src          # advisory (gradual typing)
+pre-commit install       # optional: lint on commit (.pre-commit-config.yaml)
+```
+
+CI runs ruff + pytest as required checks and mypy as an advisory job (see `.github/workflows/ci.yml`).

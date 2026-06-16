@@ -1,7 +1,11 @@
 from pathlib import Path
 
-from pi_trec.prompts import SUPPORT_EVAL_PROMPT, parse_support_label
-from pi_trec.support import iter_support_tasks, render_support_prompt
+from pi_trec.support import (
+    SUPPORT_EVAL_PROMPT,
+    iter_support_tasks,
+    parse_support_label,
+    render_support_prompt,
+)
 
 
 def test_support_prompt_matches_source_script() -> None:

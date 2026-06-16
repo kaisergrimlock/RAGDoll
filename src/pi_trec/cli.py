@@ -6,29 +6,54 @@ import argparse
 import asyncio
 import dataclasses
 import inspect
+import logging
 from argparse import SUPPRESS
 from pathlib import Path
 
-from pi_trec import nuggetizer, pyserini_wrapper, support, umbrela
+from pi_trec import (
+    cost as cost_mod,
+)
+from pi_trec import (
+    doctor as doctor_mod,
+)
+from pi_trec import (
+    nuggetizer,
+    pyserini_wrapper,
+    support,
+    trec_io,
+    umbrela,
+)
+from pi_trec import (
+    validate as validate_mod,
+)
 from pi_trec.config import (
     BaseConfig,
+    CostConfig,
+    DoctorConfig,
     LocalAgentRunConfig,
+    MaterializeAssignInputsConfig,
     MaterializeNuggetAgenticCreateConfig,
     MaterializeNuggetAssignConfig,
     MaterializeNuggetCreateConfig,
     MaterializeNuggetScoreConfig,
     MaterializeSupportConfig,
+    MaterializeTrecAnswersConfig,
     MaterializeUmbrelaConfig,
     NuggetAgenticCreateConfig,
     NuggetAssignConfig,
     NuggetCreateConfig,
+    NuggetEvalConfig,
+    NuggetMetricsConfig,
     PyseriniServeConfig,
     SupportJudgeConfig,
     UmbrelaJudgeConfig,
+    ValidateConfig,
+    VisualizeAlignmentConfig,
     load_config_file,
     load_env_file,
 )
 from pi_trec.runner import run_task_rows
+from pi_trec.visual import alignment as visual_alignment
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -98,6 +123,20 @@ def build_parser() -> argparse.ArgumentParser:
     materialize_support.add_argument("--input-file", type=Path, default=SUPPRESS)
     materialize_support.add_argument("--output-file", type=Path, default=SUPPRESS)
     finish(materialize_support, config_cls=MaterializeSupportConfig, handler=support.materialize)
+    materialize_trec_answers = materialize_subparsers.add_parser(
+        "trec-answers", help="Convert a TREC RAG answer run into the answers JSONL schema."
+    )
+    materialize_trec_answers.add_argument("--input-file", type=Path, default=SUPPRESS)
+    materialize_trec_answers.add_argument("--output-file", type=Path, default=SUPPRESS)
+    materialize_trec_answers.add_argument("--run-id", default=SUPPRESS)
+    finish(materialize_trec_answers, config_cls=MaterializeTrecAnswersConfig, handler=trec_io.materialize_trec_answers)
+    materialize_assign_inputs = materialize_subparsers.add_parser(
+        "assign-inputs", help="Join answers + nuggets (by qid) into assign payloads."
+    )
+    materialize_assign_inputs.add_argument("--answers-file", type=Path, default=SUPPRESS)
+    materialize_assign_inputs.add_argument("--nuggets-file", type=Path, default=SUPPRESS)
+    materialize_assign_inputs.add_argument("--output-file", type=Path, default=SUPPRESS)
+    finish(materialize_assign_inputs, config_cls=MaterializeAssignInputsConfig, handler=trec_io.materialize_assign_inputs)
 
     umbrela_parser = subparsers.add_parser("umbrela", help="Run UMBRELA-compatible relevance judging.")
     umbrela_subparsers = umbrela_parser.add_subparsers(dest="umbrela_command", required=True)
@@ -132,6 +171,53 @@ def build_parser() -> argparse.ArgumentParser:
     add_nugget_window_args(nugget_assign)
     nugget_assign.add_argument("--include-trace", action="store_true", default=SUPPRESS)
     finish(nugget_assign, config_cls=NuggetAssignConfig, handler=nuggetizer.assign)
+    nugget_metrics = nuggetizer_subparsers.add_parser(
+        "metrics", help="Score an assignment file (coverage + Kendall tau vs a reference)."
+    )
+    nugget_metrics.add_argument("--input-file", type=Path, default=SUPPRESS)
+    nugget_metrics.add_argument("--output-dir", type=Path, default=SUPPRESS)
+    nugget_metrics.add_argument("--reference", type=Path, default=SUPPRESS, help="Gold/reference assignment for correlation.")
+    add_logging_args(nugget_metrics)
+    finish(nugget_metrics, config_cls=NuggetMetricsConfig, handler=nuggetizer.compute_metrics)
+    nugget_eval = nuggetizer_subparsers.add_parser(
+        "eval", help="End-to-end: create (optional) -> assign -> metrics in one run."
+    )
+    add_runner_args(nugget_eval, include_input_file=False)
+    nugget_eval.add_argument("--create-input", type=Path, default=SUPPRESS, help="Candidates to CREATE nuggets from (E2E).")
+    nugget_eval.add_argument("--nuggets-file", type=Path, default=SUPPRESS, help="Fixed nuggets to assign (assignment-only).")
+    nugget_eval.add_argument("--answers-file", type=Path, default=SUPPRESS, help="Answers (topic x run) to assign.")
+    nugget_eval.add_argument("--gold", type=Path, default=SUPPRESS, help="Reference assignment for correlation.")
+    nugget_eval.add_argument("--output-dir", type=Path, default=SUPPRESS)
+    nugget_eval.add_argument("--assign-mode", choices=["support-grade-3", "support-grade-2"], default=SUPPRESS)
+    nugget_eval.add_argument("--max-nuggets", type=int, default=SUPPRESS)
+    add_nugget_window_args(nugget_eval)
+    nugget_eval.add_argument("--include-trace", action="store_true", default=SUPPRESS)
+    finish(nugget_eval, config_cls=NuggetEvalConfig, handler=nuggetizer.eval_pipeline)
+
+    doctor_parser = subparsers.add_parser("doctor", help="Check the Pi binary, agent auth state, and optionally a model.")
+    doctor_parser.add_argument("--agent-binary", default=SUPPRESS)
+    doctor_parser.add_argument("--model", default=SUPPRESS)
+    doctor_parser.add_argument("--thinking", default=SUPPRESS)
+    doctor_parser.add_argument("--agent-state-dir", type=Path, default=SUPPRESS)
+    doctor_parser.add_argument("--timeout-seconds", type=float, default=SUPPRESS)
+    doctor_parser.add_argument("--probe", action="store_true", default=SUPPRESS, help="Also send a trivial prompt to the model.")
+    add_logging_args(doctor_parser)
+    finish(doctor_parser, config_cls=DoctorConfig, handler=doctor_mod.doctor)
+
+    validate_parser = subparsers.add_parser("validate", help="Schema-check an input JSONL before a long run.")
+    validate_parser.add_argument("--input-file", type=Path, default=SUPPRESS)
+    validate_parser.add_argument("--kind", choices=["auto", *validate_mod.KINDS], default=SUPPRESS)
+    add_logging_args(validate_parser)
+    finish(validate_parser, config_cls=ValidateConfig, handler=validate_mod.validate)
+
+    cost_parser = subparsers.add_parser("cost", help="Total token usage from a raw-events dir and price it.")
+    cost_parser.add_argument("--raw-events-dir", type=Path, default=SUPPRESS)
+    cost_parser.add_argument("--output-file", type=Path, default=SUPPRESS, help="Optional per-task usage CSV.")
+    cost_parser.add_argument("--model", default=SUPPRESS)
+    cost_parser.add_argument("--input-price", type=float, default=SUPPRESS, help="USD per 1M input tokens.")
+    cost_parser.add_argument("--output-price", type=float, default=SUPPRESS, help="USD per 1M output tokens.")
+    add_logging_args(cost_parser)
+    finish(cost_parser, config_cls=CostConfig, handler=cost_mod.cost)
 
     support_parser = subparsers.add_parser("support", help="Run support evaluation through Pi.")
     support_subparsers = support_parser.add_subparsers(dest="support_command", required=True)
@@ -139,6 +225,21 @@ def build_parser() -> argparse.ArgumentParser:
     add_runner_args(support_judge)
     support_judge.add_argument("--include-prompt", action="store_true", default=SUPPRESS)
     finish(support_judge, config_cls=SupportJudgeConfig, handler=support.judge)
+
+    visualize = subparsers.add_parser("visualize", help="Render evaluation figures.")
+    visualize_subparsers = visualize.add_subparsers(dest="visualize_command", required=True)
+    alignment = visualize_subparsers.add_parser(
+        "alignment", help="Scatter a system vs reference nugget assignment with Kendall tau."
+    )
+    alignment.add_argument("--system", type=Path, default=SUPPRESS, help="System assignment JSONL (x axis).")
+    alignment.add_argument("--reference", type=Path, default=SUPPRESS, help="Reference assignment JSONL (y axis).")
+    alignment.add_argument("--output-file", type=Path, default=SUPPRESS)
+    alignment.add_argument("--metric", choices=["V_strict", "A_strict", "V", "A"], default=SUPPRESS)
+    alignment.add_argument("--x-label", default=SUPPRESS)
+    alignment.add_argument("--y-label", default=SUPPRESS)
+    alignment.add_argument("--compact", action="store_true", default=SUPPRESS)
+    add_logging_args(alignment)
+    finish(alignment, config_cls=VisualizeAlignmentConfig, handler=visual_alignment.render_alignment)
     return parser
 
 
@@ -184,11 +285,31 @@ def add_runner_args(parser: argparse.ArgumentParser, *, include_input_file: bool
         type=parse_key_value,
         help="Environment variable passed to the Pi extension process. May be repeated.",
     )
+    parser.add_argument(
+        "--temperature",
+        type=float,
+        default=SUPPRESS,
+        help="Sampling temperature. Unset by default (required for gpt-5* models).",
+    )
+    parser.add_argument("--cache-dir", type=Path, default=SUPPRESS, help="Reuse identical prompt results from this dir.")
     parser.add_argument("--resume", action="store_true", default=SUPPRESS)
     parser.add_argument("--overwrite", action="store_true", default=SUPPRESS)
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=SUPPRESS,
+        help="Select and count tasks without calling Pi.",
+    )
     parser.add_argument("--limit", type=int, default=SUPPRESS)
     parser.add_argument("--shuffle", action="store_true", default=SUPPRESS)
     parser.add_argument("--seed", type=int, default=SUPPRESS)
+    add_logging_args(parser)
+
+
+def add_logging_args(parser: argparse.ArgumentParser) -> None:
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("-v", "--verbose", action="store_true", default=SUPPRESS, help="Verbose (DEBUG) logging.")
+    group.add_argument("-q", "--quiet", action="store_true", default=SUPPRESS, help="Quiet (WARNING) logging.")
 
 
 def add_nugget_window_args(parser: argparse.ArgumentParser) -> None:
@@ -230,10 +351,22 @@ def build_config(args: argparse.Namespace) -> BaseConfig:
     return config_cls.from_sources(file_data=file_data, cli_overrides=cli_overrides)
 
 
+def setup_logging(args: argparse.Namespace) -> None:
+    """Configure root logging from ``--verbose``/``--quiet`` (default INFO)."""
+    if getattr(args, "verbose", False):
+        level = logging.DEBUG
+    elif getattr(args, "quiet", False):
+        level = logging.WARNING
+    else:
+        level = logging.INFO
+    logging.basicConfig(level=level, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+
+
 def main() -> None:
     load_env_file()
     parser = build_parser()
     args = parser.parse_args()
+    setup_logging(args)
     config = build_config(args)
     config.validate()
     handler = args.handler

@@ -3,15 +3,17 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import os
 import random
 import shutil
 import tempfile
 import time
+from collections.abc import Iterable
 from dataclasses import replace
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 from pi_trec.config import (
     DEFAULT_MAX_CONCURRENCY,
@@ -26,6 +28,7 @@ from pi_trec.config import (
 from pi_trec.jsonl import append_jsonl, completed_task_ids, read_jsonl
 
 __all__ = [
+    "CACHE_TTL_SECONDS",
     "DEFAULT_MAX_CONCURRENCY",
     "DEFAULT_MODEL",
     "DEFAULT_PROVIDER",
@@ -35,16 +38,51 @@ __all__ = [
     "LocalAgentConfig",
     "RunConfig",
     "build_agent_args",
+    "cache_key",
     "extract_assistant_text",
+    "extract_usage",
+    "read_cache",
     "run_prompt",
     "run_task_rows",
     "safe_task_filename",
     "select_rows",
+    "write_cache",
     "write_system_prompt_extension",
 ]
 
 AGENT_STATE_FILENAMES = ("auth.json", "oauth.json", "models.json")
 STDERR_TAIL_MAX_CHARS = 64_000
+# Cached prompt results expire after this; stale entries are pruned on read.
+CACHE_TTL_SECONDS = 3 * 60 * 60
+
+
+def cache_key(config: LocalAgentConfig, instruction: str) -> str:
+    """Stable hash over the inputs that determine a prompt's output."""
+    digest = hashlib.sha256()
+    for part in (config.model, config.thinking, config.system_prompt or "", str(config.temperature), instruction):
+        digest.update(part.encode("utf-8"))
+        digest.update(b"\x00")
+    return digest.hexdigest()
+
+
+def read_cache(cache_path: Path, *, now: float) -> dict[str, Any] | None:
+    """Return a cached result within the TTL; delete and skip it when stale."""
+    if not cache_path.is_file():
+        return None
+    try:
+        cached = json.loads(cache_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    cached_at = cached.get("cached_at")
+    if not isinstance(cached_at, (int, float)) or now - cached_at > CACHE_TTL_SECONDS:
+        cache_path.unlink(missing_ok=True)
+        return None
+    return cached
+
+
+def write_cache(cache_path: Path, result: dict[str, Any], *, now: float) -> None:
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    cache_path.write_text(json.dumps({**result, "cached_at": now}, ensure_ascii=False), encoding="utf-8")
 
 
 def build_agent_args(
@@ -52,9 +90,13 @@ def build_agent_args(
     model: str,
     thinking: str,
     system_prompt: str = DEFAULT_SYSTEM_PROMPT,
+    temperature: float | None = None,
     extension_path: str | None = None,
     extra_extension_paths: list[str] | None = None,
 ) -> list[str]:
+    # `temperature` is emitted only when explicitly set; the default (None)
+    # leaves it unset, which is required for gpt-5* models.
+    temperature_args = [] if temperature is None else ["--temperature", str(temperature)]
     extension_paths = [path for path in [extension_path, *(extra_extension_paths or [])] if path]
     if extension_paths:
         args = [
@@ -73,6 +115,7 @@ def build_agent_args(
                 model,
                 "--thinking",
                 thinking,
+                *temperature_args,
             ]
         )
         return args
@@ -92,7 +135,51 @@ def build_agent_args(
         model,
         "--thinking",
         thinking,
+        *temperature_args,
     ]
+
+
+_TOKEN_KEYS = {
+    "input_tokens": ("input_tokens", "prompt_tokens", "promptTokens", "inputTokens"),
+    "output_tokens": ("output_tokens", "completion_tokens", "completionTokens", "outputTokens"),
+    "total_tokens": ("total_tokens", "totalTokens"),
+}
+
+
+def _coerce_usage(usage: dict[str, Any]) -> dict[str, int]:
+    out: dict[str, int] = {}
+    for canonical, aliases in _TOKEN_KEYS.items():
+        for alias in aliases:
+            value = usage.get(alias)
+            if isinstance(value, (int, float)):
+                out[canonical] = int(value)
+                break
+    if "total_tokens" not in out and ("input_tokens" in out or "output_tokens" in out):
+        out["total_tokens"] = out.get("input_tokens", 0) + out.get("output_tokens", 0)
+    return out
+
+
+def extract_usage(events: Iterable[dict[str, Any]]) -> dict[str, int]:
+    """Best-effort token usage from the Pi event stream.
+
+    Pi/provider usage shapes vary, so this scans every event for a ``usage``
+    mapping and keeps the richest one. Returns ``{}`` when none is present; the
+    raw events are always persisted, so usage stays recoverable post hoc.
+    """
+    best: dict[str, int] = {}
+    for event in events:
+        if not isinstance(event, dict):
+            continue
+        candidates = [event.get("usage")]
+        message = event.get("message")
+        if isinstance(message, dict):
+            candidates.append(message.get("usage"))
+        for candidate in candidates:
+            if isinstance(candidate, dict):
+                coerced = _coerce_usage(candidate)
+                if coerced.get("total_tokens", 0) >= best.get("total_tokens", 0) and coerced:
+                    best = coerced
+    return best
 
 
 def write_system_prompt_extension(directory: Path, system_prompt: str) -> Path:
@@ -182,6 +269,13 @@ async def run_prompt(
     raw_events_path = raw_events_dir / f"{safe_task_filename(task_id)}.jsonl"
     agent_state_dir = config.agent_state_dir or default_agent_state_dir()
 
+    cache_path = (config.cache_dir / f"{cache_key(config, instruction)}.json") if config.cache_dir else None
+    if cache_path is not None:
+        cached = read_cache(cache_path, now=start)
+        if cached is not None:
+            cached.pop("cached_at", None)
+            return {**cached, "task_id": task_id, "metadata": metadata or {}, "cached": True}
+
     with tempfile.TemporaryDirectory(prefix="pi-trec-") as tmp:
         tmp_path = Path(tmp)
         prompt_path = tmp_path / "prompt.txt"
@@ -204,6 +298,7 @@ async def run_prompt(
                     model=config.model,
                     thinking=config.thinking,
                     system_prompt=config.system_prompt,
+                    temperature=config.temperature,
                     extension_path=str(resolved_extension_path) if resolved_extension_path else None,
                     extra_extension_paths=extra_extension_paths,
                 ),
@@ -255,6 +350,7 @@ async def run_prompt(
 
     elapsed = time.time() - start
     output_text = extract_assistant_text(events)
+    usage = extract_usage(events)
     if timed_out:
         return result_row(
             task_id=task_id,
@@ -265,6 +361,7 @@ async def run_prompt(
             error=f"TimeoutError: local agent task exceeded {config.timeout_seconds:g} seconds",
             elapsed_seconds=elapsed,
             metadata=metadata,
+            usage=usage,
         )
     if process.returncode != 0:
         error = f"local agent exited with code {process.returncode}"
@@ -279,6 +376,7 @@ async def run_prompt(
             error=error,
             elapsed_seconds=elapsed,
             metadata=metadata,
+            usage=usage,
         )
     if parse_errors:
         return result_row(
@@ -290,6 +388,7 @@ async def run_prompt(
             error="Failed to parse local agent JSON output: " + "; ".join(parse_errors[:3]),
             elapsed_seconds=elapsed,
             metadata=metadata,
+            usage=usage,
         )
     if not output_text:
         return result_row(
@@ -301,8 +400,9 @@ async def run_prompt(
             error="local agent completed without assistant text",
             elapsed_seconds=elapsed,
             metadata=metadata,
+            usage=usage,
         )
-    return result_row(
+    result = result_row(
         task_id=task_id,
         evaluator=evaluator,
         config=config,
@@ -311,7 +411,14 @@ async def run_prompt(
         error=None,
         elapsed_seconds=elapsed,
         metadata=metadata,
+        usage=usage,
     )
+    if cache_path is not None:
+        try:
+            write_cache(cache_path, result, now=time.time())
+        except OSError:
+            pass
+    return result
 
 
 def result_row(
@@ -324,6 +431,7 @@ def result_row(
     error: str | None,
     elapsed_seconds: float,
     metadata: dict[str, Any] | None,
+    usage: dict[str, int] | None = None,
 ) -> dict[str, Any]:
     return {
         "task_id": task_id,
@@ -336,6 +444,7 @@ def result_row(
         "parsed_output": None,
         "error": error,
         "elapsed_seconds": round(elapsed_seconds, 3),
+        "usage": usage or {},
         "metadata": metadata or {},
     }
 

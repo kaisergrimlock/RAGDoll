@@ -10,9 +10,10 @@ from __future__ import annotations
 import dataclasses
 import os
 import types
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, ClassVar, Mapping, Union, get_args, get_origin, get_type_hints
+from typing import Any, ClassVar, Union, get_args, get_origin, get_type_hints
 
 DEFAULT_MODEL = "openai-codex/gpt-5.5"
 DEFAULT_THINKING = "medium"
@@ -24,6 +25,27 @@ DEFAULT_SEED = 13
 
 DEFAULT_WINDOW_SIZE = 10
 DEFAULT_MAX_TRIALS = 4
+
+# `thinking=auto` resolves per model: minimal for gpt-5* (deterministic, fast),
+# otherwise DEFAULT_THINKING. Pass an explicit level to override the profile.
+THINKING_AUTO = "auto"
+GPT5_THINKING = "minimal"
+
+
+def model_name(model: str) -> str:
+    """Strip an optional ``provider/`` prefix, e.g. ``openai-codex/gpt-5.5``."""
+    return model.split("/", 1)[1] if "/" in model else model
+
+
+def is_gpt5_model(model: str) -> bool:
+    return model_name(model).lower().startswith("gpt-5")
+
+
+def resolve_thinking(model: str, thinking: str) -> str:
+    """Resolve the ``auto`` thinking profile against the target model."""
+    if thinking == THINKING_AUTO:
+        return GPT5_THINKING if is_gpt5_model(model) else DEFAULT_THINKING
+    return thinking
 
 
 @dataclass(frozen=True)
@@ -37,6 +59,8 @@ class LocalAgentConfig:
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS
     agent_state_dir: Path | None = None
     system_prompt: str = DEFAULT_SYSTEM_PROMPT
+    temperature: float | None = None
+    cache_dir: Path | None = None
     extension_path: Path | None = None
     extension_cwd: Path | None = None
     extension_env: dict[str, str] | None = None
@@ -89,7 +113,7 @@ class BaseConfig:
     _required: ClassVar[tuple[str, ...]] = ()
 
     @classmethod
-    def from_mapping(cls, data: Mapping[str, Any]) -> "BaseConfig":
+    def from_mapping(cls, data: Mapping[str, Any]) -> BaseConfig:
         """Build a config from a mapping, coercing types and ignoring unknown keys."""
         hints = get_type_hints(cls)
         field_names = {f.name for f in dataclasses.fields(cls)}
@@ -106,7 +130,7 @@ class BaseConfig:
         *,
         file_data: Mapping[str, Any] | None = None,
         cli_overrides: Mapping[str, Any],
-    ) -> "BaseConfig":
+    ) -> BaseConfig:
         """Merge defaults < YAML file < explicit CLI flags into a config."""
         merged: dict[str, Any] = {}
         if file_data:
@@ -169,6 +193,24 @@ class MaterializeSupportConfig(FileIOConfig):
 
 
 @dataclass
+class MaterializeTrecAnswersConfig(FileIOConfig):
+    """Convert a TREC RAG answer run into the ``answers`` schema."""
+
+    run_id: str | None = None
+
+
+@dataclass
+class MaterializeAssignInputsConfig(BaseConfig):
+    """Join ``answers`` + ``nuggets`` (by qid) into assign payloads."""
+
+    answers_file: Path | None = None
+    nuggets_file: Path | None = None
+    output_file: Path | None = None
+
+    _required: ClassVar[tuple[str, ...]] = ("answers_file", "nuggets_file", "output_file")
+
+
+@dataclass
 class RunConfig(BaseConfig):
     """Base config for commands that run prompts through the Pi local agent."""
 
@@ -176,11 +218,13 @@ class RunConfig(BaseConfig):
     output_file: Path | None = None
     failed_output: Path | None = None
     raw_events_dir: Path | None = None
+    cache_dir: Path | None = None
     agent_binary: str = "pi"
     provider: str = DEFAULT_PROVIDER
     model: str = DEFAULT_MODEL
-    thinking: str = DEFAULT_THINKING
+    thinking: str = THINKING_AUTO
     system_prompt: str = DEFAULT_SYSTEM_PROMPT
+    temperature: float | None = None
     max_concurrency: int = DEFAULT_MAX_CONCURRENCY
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS
     agent_state_dir: Path | None = None
@@ -189,6 +233,7 @@ class RunConfig(BaseConfig):
     extension_env: dict[str, str] | None = None
     resume: bool = False
     overwrite: bool = False
+    dry_run: bool = False
     limit: int | None = None
     shuffle: bool = False
     seed: int = DEFAULT_SEED
@@ -201,10 +246,12 @@ class RunConfig(BaseConfig):
             agent_binary=self.agent_binary,
             provider=self.provider,
             model=self.model,
-            thinking=self.thinking,
+            thinking=resolve_thinking(self.model, self.thinking),
             timeout_seconds=self.timeout_seconds,
             agent_state_dir=self.agent_state_dir,
             system_prompt=self.system_prompt,
+            temperature=self.temperature,
+            cache_dir=self.cache_dir,
             extension_path=self.extension_path,
             extension_cwd=self.extension_cwd,
             extension_env=dict(self.extension_env) if self.extension_env else None,
@@ -256,6 +303,87 @@ class NuggetAssignConfig(_NuggetRunConfig):
         super().validate()
         if bool(self.input_file) == bool(self.input_json):
             raise SystemExit("nugget assign requires exactly one of --input-file or --input-json")
+
+
+@dataclass
+class NuggetMetricsConfig(BaseConfig):
+    """`nuggetizer metrics`: score an assignment file, optionally vs a reference."""
+
+    input_file: Path | None = None
+    output_dir: Path | None = None
+    reference: Path | None = None
+
+    _required: ClassVar[tuple[str, ...]] = ("input_file", "output_dir")
+
+
+@dataclass
+class NuggetEvalConfig(_NuggetRunConfig):
+    """`nuggetizer eval`: create (optional) -> assign -> metrics in one run."""
+
+    create_input: Path | None = None  # candidates to CREATE nuggets from (E2E)
+    nuggets_file: Path | None = None  # fixed nuggets to assign (assignment-only)
+    answers_file: Path | None = None  # cells (topic x run answers) to assign
+    gold: Path | None = None  # reference assignment for correlation
+    output_dir: Path | None = None
+    assign_mode: str = "support-grade-3"
+    max_nuggets: int = 30
+
+    _required: ClassVar[tuple[str, ...]] = ("answers_file", "output_dir")
+
+    def validate(self) -> None:
+        super().validate()
+        if bool(self.create_input) == bool(self.nuggets_file):
+            raise SystemExit("nugget eval requires exactly one of --create-input or --nuggets-file")
+
+
+@dataclass
+class DoctorConfig(BaseConfig):
+    """`doctor`: verify the Pi binary, agent auth state, and (optionally) a model."""
+
+    agent_binary: str = "pi"
+    model: str = DEFAULT_MODEL
+    thinking: str = THINKING_AUTO
+    agent_state_dir: Path | None = None
+    timeout_seconds: float = 120.0
+    probe: bool = False
+
+
+@dataclass
+class ValidateConfig(BaseConfig):
+    """`validate`: schema-check an input JSONL before a long run."""
+
+    input_file: Path | None = None
+    kind: str = "auto"
+
+    _required: ClassVar[tuple[str, ...]] = ("input_file",)
+
+
+@dataclass
+class CostConfig(BaseConfig):
+    """`cost`: total token usage from a raw-events dir and price it."""
+
+    raw_events_dir: Path | None = None
+    output_file: Path | None = None
+    model: str = DEFAULT_MODEL
+    input_price: float | None = None  # USD per 1M input tokens
+    output_price: float | None = None  # USD per 1M output tokens
+
+    _required: ClassVar[tuple[str, ...]] = ("raw_events_dir",)
+
+
+@dataclass
+class VisualizeAlignmentConfig(BaseConfig):
+    """`visualize alignment`: scatter a system vs reference assignment by metric."""
+
+    system: Path | None = None
+    reference: Path | None = None
+    output_file: Path | None = None
+    metric: str = "V_strict"
+    x_label: str = "System"
+    y_label: str = "Reference"
+    compact: bool = False
+
+    _required: ClassVar[tuple[str, ...]] = ("system", "reference", "output_file")
 
 
 @dataclass
