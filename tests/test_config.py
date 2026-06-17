@@ -27,10 +27,9 @@ def test_defaults_match_legacy_values() -> None:
     assert run.agent_binary == "pi"
     assert run.provider == "pi"
     assert run.model == "openai-codex/gpt-5.5"
-    # Default thinking is the per-model "auto" profile (minimal for gpt-5*).
-    assert run.thinking == "auto"
+    assert run.thinking == "medium"
     assert run.temperature is None
-    assert run.local_agent_config().thinking == "minimal"
+    assert run.local_agent_config().thinking == "medium"
     assert run.system_prompt == ""
     assert run.timeout_seconds == 900.0
     assert run.max_concurrency == 8

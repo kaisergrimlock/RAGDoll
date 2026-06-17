@@ -27,7 +27,7 @@ pi --no-tools --no-session --no-skills --no-context-files \
   --model openai-codex/gpt-5.5 --thinking minimal @/tmp/.../prompt.txt
 ```
 
-`--thinking` defaults to `auto`, which resolves per model: `minimal` for `gpt-5*` (deterministic and fast) and `medium` otherwise. Pass an explicit level to override. `--temperature` is left unset by default (required for `gpt-5*`); set it only for models that accept it.
+`--thinking` defaults to `medium`. Pass `--thinking auto` to resolve per model (`minimal` for `gpt-5*`, `medium` otherwise), or pass an explicit level such as `minimal`/`high` to override. `--temperature` is left unset by default (required for `gpt-5*`); set it only for models that accept it.
 
 The rendered prompt is written to a temporary UTF-8 text file and passed to Pi with its `@file` initial-message syntax. This avoids OS command-line argument length limits for long RAG prompts.
 The default system prompt is explicitly set to the empty string so the model-facing instruction is the evaluator prompt rather than Pi's coding-assistant system prompt.
@@ -223,6 +223,48 @@ uv run pi-trec support judge \
 ```
 
 The support prompt is copied exactly from `trec2024-rag/support_eval/code/support_evaluation_individual_gpt4o.py`, associated with the SIGIR 2025 support evaluation paper: <https://doi.org/10.1145/3726302.3730165>.
+
+## Arena System Comparison
+
+Rank a set of RAG systems with Search Arena-style pairwise LLM judgments. Each
+answer file is one system/run, using either the normalized `answers` schema
+from `materialize trec-answers` or official TREC RAG rows. Sentence-level
+`answer[].text` fields are concatenated into plain answer text for the judge;
+citations and references are not rendered in the prompt.
+
+```bash
+uv run pi-trec arena compare-all \
+  --answers-dir answers/ \
+  --output-dir results/arena \
+  --model openai-codex/gpt-5.5 \
+  --thinking minimal \
+  --overwrite
+```
+
+`--answers-dir` loads all `*.jsonl` files in sorted filename order. For a small
+ad hoc run, pass repeated `--answers <file>` flags instead.
+
+For every pair of systems, Pi-TREC compares only shared `qid`s and never mixes
+answers from different questions. Assistant A/B display order is randomized per
+task from `--seed` and recorded in `judgments.jsonl`, so `[[A]]`/`[[B]]` verdicts
+can be mapped back to the original `run_id`. The output directory contains
+`tasks.jsonl`, `judgments.jsonl`, `pairwise.csv`, `coverage.csv`,
+`leaderboard.csv`, and `raw-events/`. The headline ranking is an Arena-style
+rating fit from the pairwise judgments; pairwise preference rates are
+diagnostics.
+
+Arena scores are fit with SciPy's optimizer over the Bradley-Terry/logistic
+paired-comparison likelihood, with wins as `1.0`, losses as `0.0`, and ties as
+`0.5`. Ratings are reported on an Elo-like Arena scale centered at `1000`, with
+`400` points corresponding to one base-10 log-odds unit.
+
+Materialize exact judge prompts without running Pi:
+
+```bash
+uv run pi-trec materialize arena \
+  --answers-dir answers/ \
+  --output-file results/arena.tasks.jsonl
+```
 
 ## Data
 

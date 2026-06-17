@@ -42,8 +42,13 @@ def test_resolve_thinking_profile() -> None:
     assert resolve_thinking("openai-codex/gpt-5.5", "high") == "high"  # explicit wins
 
 
-def test_run_config_resolves_minimal_for_gpt5() -> None:
+def test_run_config_defaults_to_medium_for_gpt5() -> None:
     cfg = RunConfig(model="openai-codex/gpt-5.4-mini", temperature=0.2)
     agent = cfg.local_agent_config()
-    assert agent.thinking == "minimal"
+    assert agent.thinking == "medium"
     assert agent.temperature == 0.2
+
+
+def test_run_config_auto_resolves_minimal_for_gpt5() -> None:
+    cfg = RunConfig(model="openai-codex/gpt-5.4-mini", thinking="auto")
+    assert cfg.local_agent_config().thinking == "minimal"

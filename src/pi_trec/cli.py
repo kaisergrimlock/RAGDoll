@@ -11,6 +11,7 @@ from argparse import SUPPRESS
 from pathlib import Path
 
 from pi_trec import (
+    arena,
     cost as cost_mod,
 )
 from pi_trec import (
@@ -27,11 +28,13 @@ from pi_trec import (
     validate as validate_mod,
 )
 from pi_trec.config import (
+    ArenaCompareAllConfig,
     BaseConfig,
     CostConfig,
     DoctorConfig,
     LocalAgentRunConfig,
     MaterializeAssignInputsConfig,
+    MaterializeArenaConfig,
     MaterializeNuggetAgenticCreateConfig,
     MaterializeNuggetAssignConfig,
     MaterializeNuggetCreateConfig,
@@ -137,6 +140,12 @@ def build_parser() -> argparse.ArgumentParser:
     materialize_assign_inputs.add_argument("--nuggets-file", type=Path, default=SUPPRESS)
     materialize_assign_inputs.add_argument("--output-file", type=Path, default=SUPPRESS)
     finish(materialize_assign_inputs, config_cls=MaterializeAssignInputsConfig, handler=trec_io.materialize_assign_inputs)
+    materialize_arena = materialize_subparsers.add_parser("arena", help="Materialize arena system-comparison prompts.")
+    materialize_arena.add_argument("--answers", type=Path, action="append", default=SUPPRESS)
+    materialize_arena.add_argument("--answers-dir", type=Path, default=SUPPRESS)
+    materialize_arena.add_argument("--output-file", type=Path, default=SUPPRESS)
+    materialize_arena.add_argument("--seed", type=int, default=SUPPRESS)
+    finish(materialize_arena, config_cls=MaterializeArenaConfig, handler=arena.materialize)
 
     umbrela_parser = subparsers.add_parser("umbrela", help="Run UMBRELA-compatible relevance judging.")
     umbrela_subparsers = umbrela_parser.add_subparsers(dest="umbrela_command", required=True)
@@ -226,6 +235,12 @@ def build_parser() -> argparse.ArgumentParser:
     support_judge.add_argument("--include-prompt", action="store_true", default=SUPPRESS)
     finish(support_judge, config_cls=SupportJudgeConfig, handler=support.judge)
 
+    arena_parser = subparsers.add_parser("arena", help="Run Search Arena-style system comparisons.")
+    arena_subparsers = arena_parser.add_subparsers(dest="arena_command", required=True)
+    arena_compare_all = arena_subparsers.add_parser("compare-all", help="Rank systems from all pairwise arena battles.")
+    add_arena_compare_args(arena_compare_all)
+    finish(arena_compare_all, config_cls=ArenaCompareAllConfig, handler=arena.compare_all)
+
     visualize = subparsers.add_parser("visualize", help="Render evaluation figures.")
     visualize_subparsers = visualize.add_subparsers(dest="visualize_command", required=True)
     alignment = visualize_subparsers.add_parser(
@@ -312,6 +327,46 @@ def add_runner_args(parser: argparse.ArgumentParser, *, include_input_file: bool
         default=SUPPRESS,
         help="Select and count tasks without calling Pi.",
     )
+    parser.add_argument("--limit", type=int, default=SUPPRESS)
+    parser.add_argument("--shuffle", action="store_true", default=SUPPRESS)
+    parser.add_argument("--seed", type=int, default=SUPPRESS)
+    add_logging_args(parser)
+
+
+def add_arena_compare_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--answers", type=Path, action="append", default=SUPPRESS)
+    parser.add_argument("--answers-dir", type=Path, default=SUPPRESS)
+    parser.add_argument("--output-dir", type=Path, default=SUPPRESS)
+    parser.add_argument("--raw-events-dir", type=Path, default=SUPPRESS)
+    parser.add_argument("--agent-binary", default=SUPPRESS)
+    parser.add_argument("--provider", default=SUPPRESS)
+    parser.add_argument("--model", default=SUPPRESS)
+    parser.add_argument("--thinking", default=SUPPRESS)
+    parser.add_argument(
+        "--system-prompt",
+        default=SUPPRESS,
+        help="Exact Pi system prompt. Defaults to empty string to avoid Pi's coding-assistant default prompt.",
+    )
+    parser.add_argument("--max-concurrency", type=int, default=SUPPRESS)
+    parser.add_argument("--timeout-seconds", type=float, default=SUPPRESS)
+    parser.add_argument("--agent-state-dir", type=Path, default=SUPPRESS)
+    parser.add_argument("--extension-path", type=Path, default=SUPPRESS, help="Optional Pi extension path to load with -e.")
+    parser.add_argument("--extension-cwd", type=Path, default=SUPPRESS, help="Working directory for the Pi extension process.")
+    parser.add_argument(
+        "--extension-env",
+        action="append",
+        default=SUPPRESS,
+        metavar="KEY=VALUE",
+        type=parse_key_value,
+        help="Environment variable passed to the Pi extension process. May be repeated.",
+    )
+    parser.add_argument("--temperature", type=float, default=SUPPRESS)
+    cache_group = parser.add_mutually_exclusive_group()
+    cache_group.add_argument("--cache-dir", type=Path, default=SUPPRESS)
+    cache_group.add_argument("--no-cache", action="store_true", default=SUPPRESS)
+    parser.add_argument("--resume", action="store_true", default=SUPPRESS)
+    parser.add_argument("--overwrite", action="store_true", default=SUPPRESS)
+    parser.add_argument("--dry-run", action="store_true", default=SUPPRESS)
     parser.add_argument("--limit", type=int, default=SUPPRESS)
     parser.add_argument("--shuffle", action="store_true", default=SUPPRESS)
     parser.add_argument("--seed", type=int, default=SUPPRESS)
