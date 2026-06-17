@@ -237,7 +237,7 @@ uv run pi-trec arena compare-all \
   --answers-dir answers/ \
   --output-dir results/arena \
   --model openai-codex/gpt-5.5 \
-  --thinking minimal \
+  --thinking medium \
   --overwrite
 ```
 
@@ -252,6 +252,12 @@ can be mapped back to the original `run_id`. The output directory contains
 `leaderboard.csv`, and `raw-events/`. The headline ranking is an Arena-style
 rating fit from the pairwise judgments; pairwise preference rates are
 diagnostics.
+
+The judging workflow and stored verdicts are independent of the ranking backend:
+`judgments.jsonl` records the same pairwise `[[A]]`, `[[B]]`, and `[[Tie]]`
+outcomes, while `leaderboard.csv` converts those outcomes into Arena ratings.
+Leaderboard rows contain `rank`, `run_id`, `arena_score`, `n_judgments`, `wins`,
+`losses`, and `ties`.
 
 Arena scores are fit with SciPy's optimizer over the Bradley-Terry/logistic
 paired-comparison likelihood, with wins as `1.0`, losses as `0.0`, and ties as
