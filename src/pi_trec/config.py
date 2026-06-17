@@ -346,6 +346,57 @@ class NuggetEvalConfig(_NuggetRunConfig):
 
 
 @dataclass
+class RubricAuthorConfig(_NuggetRunConfig):
+    """`rubric author`: turn a nuggets file into a weighted ResearchRubrics rubric."""
+
+
+@dataclass
+class RubricGradeConfig(_NuggetRunConfig):
+    """`rubric grade`: ternary-grade answers against a rubric (joined or direct)."""
+
+    input_json: str | None = None
+
+    _required: ClassVar[tuple[str, ...]] = ("output_file",)
+
+    def validate(self) -> None:
+        super().validate()
+        if bool(self.input_file) == bool(self.input_json):
+            raise SystemExit("rubric grade requires exactly one of --input-file or --input-json")
+
+
+@dataclass
+class RubricScoreConfig(BaseConfig):
+    """`rubric score`: score a graded rubric file, optionally vs a reference."""
+
+    input_file: Path | None = None
+    output_dir: Path | None = None
+    reference: Path | None = None
+
+    _required: ClassVar[tuple[str, ...]] = ("input_file", "output_dir")
+
+
+@dataclass
+class RubricEvalConfig(_NuggetRunConfig):
+    """`rubric eval`: rubric (authored or fixed) -> grade -> score in one run."""
+
+    create_input: Path | None = None  # candidates to CREATE nuggets from, then author (E2E)
+    nuggets_file: Path | None = None  # fixed nuggets to author a rubric from
+    rubric_file: Path | None = None  # pre-authored rubric to grade against (skip authoring)
+    answers_file: Path | None = None  # cells (topic x run answers) to grade
+    gold: Path | None = None  # reference graded file for correlation
+    output_dir: Path | None = None
+    max_nuggets: int = 30
+
+    _required: ClassVar[tuple[str, ...]] = ("answers_file", "output_dir")
+
+    def validate(self) -> None:
+        super().validate()
+        sources = [self.create_input, self.nuggets_file, self.rubric_file]
+        if sum(1 for source in sources if source) != 1:
+            raise SystemExit("rubric eval requires exactly one of --create-input, --nuggets-file, or --rubric-file")
+
+
+@dataclass
 class DoctorConfig(BaseConfig):
     """`doctor`: verify the Pi binary, agent auth state, and (optionally) a model."""
 

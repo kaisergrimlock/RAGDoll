@@ -4,7 +4,7 @@ import asyncio
 from typing import Any
 
 from pi_trec.config import SupportJudgeConfig
-from pi_trec.jsonl import append_jsonl, read_jsonl
+from pi_trec.jsonl import append_jsonl, completed_task_ids, read_jsonl
 from pi_trec.runner import run_prompt
 from pi_trec.support.prompts import parse_support_label
 from pi_trec.support.stages import iter_support_tasks
@@ -14,6 +14,12 @@ async def judge(config: SupportJudgeConfig) -> None:
     if config.overwrite and config.output_file.exists():
         config.output_file.unlink()
     tasks = iter_support_tasks(list(read_jsonl(config.input_file)))
+    if config.resume and not config.overwrite:
+        done = completed_task_ids(config.output_file)
+        before = len(tasks)
+        tasks = [task for task in tasks if str(task["task_id"]) not in done]
+        if before != len(tasks):
+            print(f"resume: skipped {before - len(tasks)} completed task(s)", flush=True)
     if config.limit is not None:
         tasks = tasks[: config.limit]
     agent_config = config.local_agent_config()

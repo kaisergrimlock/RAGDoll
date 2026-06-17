@@ -19,6 +19,17 @@ def test_extract_usage_anthropic_and_openai_shapes() -> None:
     assert extract_usage([{"type": "message_start"}]) == {}
 
 
+def test_extract_usage_pi_shape_with_cost() -> None:
+    # Pi/openai-codex emits bare input/output keys, totalTokens, and a nested USD cost.
+    pi = [{"type": "assistant", "message": {"usage": {
+        "input": 552, "output": 180, "cacheRead": 0, "cacheWrite": 0, "totalTokens": 732,
+        "cost": {"input": 0.000414, "output": 0.00081, "total": 0.001224},
+    }}}]
+    assert extract_usage(pi) == {
+        "input_tokens": 552, "output_tokens": 180, "total_tokens": 732, "cost_usd": 0.001224,
+    }
+
+
 def test_cache_key_depends_on_inputs() -> None:
     base = LocalAgentConfig(model="m", thinking="minimal")
     key = cache_key(base, "prompt")

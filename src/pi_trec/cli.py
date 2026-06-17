@@ -19,6 +19,7 @@ from pi_trec import (
 from pi_trec import (
     nuggetizer,
     pyserini_wrapper,
+    rubric,
     support,
     trec_io,
     umbrela,
@@ -45,6 +46,10 @@ from pi_trec.config import (
     NuggetEvalConfig,
     NuggetMetricsConfig,
     PyseriniServeConfig,
+    RubricAuthorConfig,
+    RubricEvalConfig,
+    RubricGradeConfig,
+    RubricScoreConfig,
     SupportJudgeConfig,
     UmbrelaJudgeConfig,
     ValidateConfig,
@@ -193,6 +198,42 @@ def build_parser() -> argparse.ArgumentParser:
     add_nugget_window_args(nugget_eval)
     nugget_eval.add_argument("--include-trace", action="store_true", default=SUPPRESS)
     finish(nugget_eval, config_cls=NuggetEvalConfig, handler=nuggetizer.eval_pipeline)
+
+    rubric_parser = subparsers.add_parser("rubric", help="Run ResearchRubrics-style evaluation through Pi.")
+    rubric_subparsers = rubric_parser.add_subparsers(dest="rubric_command", required=True)
+    rubric_author = rubric_subparsers.add_parser("author", help="Author a weighted rubric from a nuggets file.")
+    add_runner_args(rubric_author)
+    add_nugget_window_args(rubric_author)
+    rubric_author.add_argument("--include-trace", action="store_true", default=SUPPRESS)
+    finish(rubric_author, config_cls=RubricAuthorConfig, handler=rubric.author)
+    rubric_grade = rubric_subparsers.add_parser("grade", help="Ternary-grade answers against a rubric through Pi.")
+    add_runner_args(rubric_grade, include_input_file=False)
+    add_assign_input_args(rubric_grade)
+    add_nugget_window_args(rubric_grade)
+    rubric_grade.add_argument("--include-trace", action="store_true", default=SUPPRESS)
+    finish(rubric_grade, config_cls=RubricGradeConfig, handler=rubric.grade)
+    rubric_score = rubric_subparsers.add_parser(
+        "score", help="Score a graded rubric file (ternary + binary, Kendall tau vs a reference)."
+    )
+    rubric_score.add_argument("--input-file", type=Path, default=SUPPRESS)
+    rubric_score.add_argument("--output-dir", type=Path, default=SUPPRESS)
+    rubric_score.add_argument("--reference", type=Path, default=SUPPRESS, help="Gold/reference graded file for correlation.")
+    add_logging_args(rubric_score)
+    finish(rubric_score, config_cls=RubricScoreConfig, handler=rubric.compute_scores)
+    rubric_eval = rubric_subparsers.add_parser(
+        "eval", help="End-to-end: rubric (authored or fixed) -> grade -> score in one run."
+    )
+    add_runner_args(rubric_eval, include_input_file=False)
+    rubric_eval.add_argument("--create-input", type=Path, default=SUPPRESS, help="Candidates to CREATE nuggets from, then author (E2E).")
+    rubric_eval.add_argument("--nuggets-file", type=Path, default=SUPPRESS, help="Fixed nuggets to author a rubric from.")
+    rubric_eval.add_argument("--rubric-file", type=Path, default=SUPPRESS, help="Pre-authored rubric to grade against.")
+    rubric_eval.add_argument("--answers-file", type=Path, default=SUPPRESS, help="Answers (topic x run) to grade.")
+    rubric_eval.add_argument("--gold", type=Path, default=SUPPRESS, help="Reference graded file for correlation.")
+    rubric_eval.add_argument("--output-dir", type=Path, default=SUPPRESS)
+    rubric_eval.add_argument("--max-nuggets", type=int, default=SUPPRESS)
+    add_nugget_window_args(rubric_eval)
+    rubric_eval.add_argument("--include-trace", action="store_true", default=SUPPRESS)
+    finish(rubric_eval, config_cls=RubricEvalConfig, handler=rubric.rubric_eval_pipeline)
 
     doctor_parser = subparsers.add_parser("doctor", help="Check the Pi binary, agent auth state, and optionally a model.")
     doctor_parser.add_argument("--agent-binary", default=SUPPRESS)

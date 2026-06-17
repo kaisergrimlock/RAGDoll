@@ -140,14 +140,14 @@ def build_agent_args(
 
 
 _TOKEN_KEYS = {
-    "input_tokens": ("input_tokens", "prompt_tokens", "promptTokens", "inputTokens"),
-    "output_tokens": ("output_tokens", "completion_tokens", "completionTokens", "outputTokens"),
+    "input_tokens": ("input_tokens", "prompt_tokens", "promptTokens", "inputTokens", "input"),
+    "output_tokens": ("output_tokens", "completion_tokens", "completionTokens", "outputTokens", "output"),
     "total_tokens": ("total_tokens", "totalTokens"),
 }
 
 
-def _coerce_usage(usage: dict[str, Any]) -> dict[str, int]:
-    out: dict[str, int] = {}
+def _coerce_usage(usage: dict[str, Any]) -> dict[str, float]:
+    out: dict[str, float] = {}
     for canonical, aliases in _TOKEN_KEYS.items():
         for alias in aliases:
             value = usage.get(alias)
@@ -156,17 +156,25 @@ def _coerce_usage(usage: dict[str, Any]) -> dict[str, int]:
                 break
     if "total_tokens" not in out and ("input_tokens" in out or "output_tokens" in out):
         out["total_tokens"] = out.get("input_tokens", 0) + out.get("output_tokens", 0)
+    # Provider-reported USD cost (Pi emits a nested ``cost`` mapping).
+    cost = usage.get("cost")
+    if isinstance(cost, dict):
+        total_cost = cost.get("total")
+        if isinstance(total_cost, (int, float)):
+            out["cost_usd"] = float(total_cost)
     return out
 
 
-def extract_usage(events: Iterable[dict[str, Any]]) -> dict[str, int]:
+def extract_usage(events: Iterable[dict[str, Any]]) -> dict[str, float]:
     """Best-effort token usage from the Pi event stream.
 
     Pi/provider usage shapes vary, so this scans every event for a ``usage``
-    mapping and keeps the richest one. Returns ``{}`` when none is present; the
-    raw events are always persisted, so usage stays recoverable post hoc.
+    mapping and keeps the richest one (by total tokens). Captures the
+    input/output split and the provider's USD ``cost`` when present. Returns
+    ``{}`` when none is present; raw events are always persisted, so usage stays
+    recoverable post hoc.
     """
-    best: dict[str, int] = {}
+    best: dict[str, float] = {}
     for event in events:
         if not isinstance(event, dict):
             continue
@@ -431,7 +439,7 @@ def result_row(
     error: str | None,
     elapsed_seconds: float,
     metadata: dict[str, Any] | None,
-    usage: dict[str, int] | None = None,
+    usage: dict[str, float] | None = None,
 ) -> dict[str, Any]:
     return {
         "task_id": task_id,
