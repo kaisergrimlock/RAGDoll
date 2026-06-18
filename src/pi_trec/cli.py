@@ -150,6 +150,10 @@ def build_parser() -> argparse.ArgumentParser:
     materialize_arena.add_argument("--answers-dir", type=Path, default=SUPPRESS)
     materialize_arena.add_argument("--output-file", type=Path, default=SUPPRESS)
     materialize_arena.add_argument("--seed", type=int, default=SUPPRESS)
+    materialize_arena.add_argument("--sample-topics-per-pair", type=int, default=SUPPRESS)
+    materialize_arena.add_argument("--sample-battles-per-topic", type=int, default=SUPPRESS)
+    materialize_arena.add_argument("--sample-battles-per-system-per-topic", type=float, default=SUPPRESS)
+    materialize_arena.add_argument("--sampling-seed", type=int, default=SUPPRESS)
     finish(materialize_arena, config_cls=MaterializeArenaConfig, handler=arena.materialize)
 
     umbrela_parser = subparsers.add_parser("umbrela", help="Run UMBRELA-compatible relevance judging.")
@@ -411,6 +415,10 @@ def add_arena_compare_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--limit", type=int, default=SUPPRESS)
     parser.add_argument("--shuffle", action="store_true", default=SUPPRESS)
     parser.add_argument("--seed", type=int, default=SUPPRESS)
+    parser.add_argument("--sample-topics-per-pair", type=int, default=SUPPRESS)
+    parser.add_argument("--sample-battles-per-topic", type=int, default=SUPPRESS)
+    parser.add_argument("--sample-battles-per-system-per-topic", type=float, default=SUPPRESS)
+    parser.add_argument("--sampling-seed", type=int, default=SUPPRESS)
     add_logging_args(parser)
 
 

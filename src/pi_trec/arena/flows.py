@@ -23,7 +23,14 @@ def _answer_paths(*, answers: list[Path], answers_dir: Path | None) -> list[Path
 
 def materialize(config: MaterializeArenaConfig) -> None:
     answer_sets = load_answer_sets(_answer_paths(answers=config.answers, answers_dir=config.answers_dir))
-    tasks = iter_arena_tasks(answer_sets, seed=config.seed)
+    tasks = iter_arena_tasks(
+        answer_sets,
+        seed=config.seed,
+        sample_topics_per_pair=config.sample_topics_per_pair,
+        sample_battles_per_topic=config.sample_battles_per_topic,
+        sample_battles_per_system_per_topic=config.sample_battles_per_system_per_topic,
+        sampling_seed=config.sampling_seed,
+    )
     count = write_jsonl(config.output_file, tasks)
     print(f"wrote={count} output={config.output_file}")
 
@@ -95,7 +102,14 @@ def _write_summaries(output_dir: Path, judgments_path: Path, coverage: list[dict
 
 async def compare_all(config: ArenaCompareAllConfig) -> None:
     answer_sets = load_answer_sets(_answer_paths(answers=config.answers, answers_dir=config.answers_dir))
-    tasks = iter_arena_tasks(answer_sets, seed=config.seed)
+    tasks = iter_arena_tasks(
+        answer_sets,
+        seed=config.seed,
+        sample_topics_per_pair=config.sample_topics_per_pair,
+        sample_battles_per_topic=config.sample_battles_per_topic,
+        sample_battles_per_system_per_topic=config.sample_battles_per_system_per_topic,
+        sampling_seed=config.sampling_seed,
+    )
 
     if config.dry_run:
         print(f"[dry-run] arena compare-all would process {len(tasks)} tasks -> {config.output_dir}")

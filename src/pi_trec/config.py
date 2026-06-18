@@ -228,6 +228,10 @@ class MaterializeArenaConfig(BaseConfig):
     answers_dir: Path | None = None
     output_file: Path | None = None
     seed: int = DEFAULT_SEED
+    sample_topics_per_pair: int | None = None
+    sample_battles_per_topic: int | None = None
+    sample_battles_per_system_per_topic: float | None = None
+    sampling_seed: int | None = None
 
     _required: ClassVar[tuple[str, ...]] = ("output_file",)
 
@@ -237,6 +241,22 @@ class MaterializeArenaConfig(BaseConfig):
             raise SystemExit("arena materialize requires either --answers or --answers-dir, not both")
         if not self.answers and self.answers_dir is None:
             raise SystemExit("arena materialize requires --answers files or --answers-dir")
+        if self.sample_topics_per_pair is not None and self.sample_topics_per_pair <= 0:
+            raise SystemExit("arena materialize --sample-topics-per-pair must be positive")
+        sampling_modes = [
+            self.sample_topics_per_pair is not None,
+            self.sample_battles_per_topic is not None,
+            self.sample_battles_per_system_per_topic is not None,
+        ]
+        if sum(sampling_modes) > 1:
+            raise SystemExit("arena materialize sampling flags are mutually exclusive")
+        if self.sample_battles_per_topic is not None and self.sample_battles_per_topic <= 0:
+            raise SystemExit("arena materialize --sample-battles-per-topic must be positive")
+        if (
+            self.sample_battles_per_system_per_topic is not None
+            and self.sample_battles_per_system_per_topic <= 0
+        ):
+            raise SystemExit("arena materialize --sample-battles-per-system-per-topic must be positive")
 
 
 @dataclass
@@ -311,6 +331,10 @@ class ArenaCompareAllConfig(RunConfig):
     answers: list[Path] = dataclasses.field(default_factory=list)
     answers_dir: Path | None = None
     output_dir: Path | None = None
+    sample_topics_per_pair: int | None = None
+    sample_battles_per_topic: int | None = None
+    sample_battles_per_system_per_topic: float | None = None
+    sampling_seed: int | None = None
 
     _required: ClassVar[tuple[str, ...]] = ("output_dir",)
 
@@ -320,6 +344,22 @@ class ArenaCompareAllConfig(RunConfig):
             raise SystemExit("arena compare-all requires either --answers or --answers-dir, not both")
         if not self.answers and self.answers_dir is None:
             raise SystemExit("arena compare-all requires --answers files or --answers-dir")
+        if self.sample_topics_per_pair is not None and self.sample_topics_per_pair <= 0:
+            raise SystemExit("arena compare-all --sample-topics-per-pair must be positive")
+        sampling_modes = [
+            self.sample_topics_per_pair is not None,
+            self.sample_battles_per_topic is not None,
+            self.sample_battles_per_system_per_topic is not None,
+        ]
+        if sum(sampling_modes) > 1:
+            raise SystemExit("arena compare-all sampling flags are mutually exclusive")
+        if self.sample_battles_per_topic is not None and self.sample_battles_per_topic <= 0:
+            raise SystemExit("arena compare-all --sample-battles-per-topic must be positive")
+        if (
+            self.sample_battles_per_system_per_topic is not None
+            and self.sample_battles_per_system_per_topic <= 0
+        ):
+            raise SystemExit("arena compare-all --sample-battles-per-system-per-topic must be positive")
 
 
 @dataclass

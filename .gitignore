@@ -39,6 +39,7 @@ htmlcov/
 # Run outputs / artifacts (project-specific)
 results/
 raw-events/
+scripts/
 *.failed.jsonl
 
 # IDE / editor

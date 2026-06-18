@@ -253,6 +253,40 @@ can be mapped back to the original `run_id`. The output directory contains
 rating fit from the pairwise judgments; pairwise preference rates are
 diagnostics.
 
+To reduce judge cost, sample a fixed number of shared topics per system pair
+before materialization or judging:
+
+```bash
+uv run pi-trec arena compare-all \
+  --answers-dir answers/ \
+  --output-dir results/arena-k5 \
+  --sample-topics-per-pair 5 \
+  --sampling-seed 13 \
+  --model openai-codex/gpt-5.5
+```
+
+The same flags work with `materialize arena`; sampling is deterministic per
+system pair and never compares answers from different `qid`s.
+
+For a more Chatbot Arena-like sparse comparison graph, sample battles within
+each topic instead. This targets a fixed number of battle appearances per
+available system per topic:
+
+```bash
+uv run pi-trec arena compare-all \
+  --answers-dir answers/ \
+  --output-dir results/arena-d2 \
+  --sample-battles-per-system-per-topic 2 \
+  --sampling-seed 13 \
+  --model openai-codex/gpt-5.5
+```
+
+With 76 systems, `--sample-battles-per-system-per-topic 2` materializes about
+76 battles per topic; with 102 systems, it materializes about 102 battles per
+topic. Pi-TREC also supports the absolute `--sample-battles-per-topic <n>` flag
+for fixed-size experiments. The topic and battle sampling flags are mutually
+exclusive.
+
 The judging workflow and stored verdicts are independent of the ranking backend:
 `judgments.jsonl` records the same pairwise `[[A]]`, `[[B]]`, and `[[Tie]]`
 outcomes, while `leaderboard.csv` converts those outcomes into Arena ratings.

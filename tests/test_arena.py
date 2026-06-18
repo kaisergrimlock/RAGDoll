@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from pi_trec.arena import (
+    battles_for_system_degree,
     fit_arena_ratings,
     iter_arena_tasks,
     leaderboard_rows,
@@ -13,6 +14,8 @@ from pi_trec.arena import (
     load_answer_sets,
     pairwise_rows,
     parse_verdict,
+    sampled_pair_qids,
+    sampled_topic_pairs,
 )
 from pi_trec.arena.stages import assistant_order, coverage_rows
 from pi_trec.cli import main
@@ -154,6 +157,83 @@ def test_assistant_order_is_deterministic_and_recorded(tmp_path: Path) -> None:
     )
 
 
+def test_sampled_pair_qids_is_deterministic_and_pair_order_invariant() -> None:
+    qids = ["q1", "q2", "q3", "q4"]
+
+    first = sampled_pair_qids(qids, run_a="sys-a", run_b="sys-b", k=2, seed=7)
+    second = sampled_pair_qids(qids, run_a="sys-b", run_b="sys-a", k=2, seed=7)
+
+    assert first == second
+    assert len(first) == 2
+    assert first == sorted(first)
+    assert set(first) <= set(qids)
+
+
+def test_iter_arena_tasks_samples_shared_qids_per_pair(tmp_path: Path) -> None:
+    left = _write(
+        tmp_path / "a.jsonl",
+        [
+            {"run_id": "sys-a", "qid": "q1", "query": "q1", "answer_text": "a1"},
+            {"run_id": "sys-a", "qid": "q2", "query": "q2", "answer_text": "a2"},
+            {"run_id": "sys-a", "qid": "q3", "query": "q3", "answer_text": "a3"},
+        ],
+    )
+    right = _write(
+        tmp_path / "b.jsonl",
+        [
+            {"run_id": "sys-b", "qid": "q1", "query": "q1", "answer_text": "b1"},
+            {"run_id": "sys-b", "qid": "q2", "query": "q2", "answer_text": "b2"},
+            {"run_id": "sys-b", "qid": "q3", "query": "q3", "answer_text": "b3"},
+        ],
+    )
+
+    tasks = iter_arena_tasks(load_answer_sets([left, right]), seed=13, sample_topics_per_pair=2, sampling_seed=99)
+
+    assert len(tasks) == 2
+    assert [task["metadata"]["qid"] for task in tasks] == sampled_pair_qids(
+        ["q1", "q2", "q3"],
+        run_a="sys-a",
+        run_b="sys-b",
+        k=2,
+        seed=99,
+    )
+
+
+def test_sampled_topic_pairs_supports_degree_one_matching() -> None:
+    pairs = [(f"s{i}", f"s{j}") for i in range(5) for j in range(i + 1, 5)]
+
+    sampled = sampled_topic_pairs(pairs, qid="q1", battles_per_topic=3, seed=17)
+
+    assert len(sampled) == 3
+    assert len({run_id for pair in sampled for run_id in pair}) == 5
+
+
+def test_iter_arena_tasks_samples_battles_per_system_per_topic(tmp_path: Path) -> None:
+    paths = []
+    for run_id in ["sys-a", "sys-b", "sys-c", "sys-d"]:
+        paths.append(
+            _write(
+                tmp_path / f"{run_id}.jsonl",
+                [
+                    {"run_id": run_id, "qid": "q1", "query": "q1", "answer_text": run_id},
+                    {"run_id": run_id, "qid": "q2", "query": "q2", "answer_text": run_id},
+                ],
+            )
+        )
+
+    tasks = iter_arena_tasks(
+        load_answer_sets(paths),
+        seed=13,
+        sample_battles_per_system_per_topic=1,
+        sampling_seed=99,
+    )
+
+    assert battles_for_system_degree(4, 1) == 2
+    assert len(tasks) == 4
+    assert {task["metadata"]["qid"] for task in tasks} == {"q1", "q2"}
+    assert all(task["metadata"]["pair"][0] != task["metadata"]["pair"][1] for task in tasks)
+
+
 def test_parse_verdict_requires_single_label() -> None:
     assert parse_verdict("[[A]]") == "A"
     assert parse_verdict(" [[B]]\n") == "B"
@@ -237,6 +317,76 @@ def test_materialize_arena_cli_accepts_answers_dir(tmp_path: Path, monkeypatch) 
 
     row = json.loads(output.read_text(encoding="utf-8"))
     assert row["metadata"]["pair"] == ["sys-a", "sys-b"]
+
+
+def test_materialize_arena_cli_samples_topics_per_pair(tmp_path: Path, monkeypatch) -> None:
+    left = _write(
+        tmp_path / "a.jsonl",
+        [
+            {"run_id": "sys-a", "qid": "q1", "query": "q1", "answer_text": "a1"},
+            {"run_id": "sys-a", "qid": "q2", "query": "q2", "answer_text": "a2"},
+            {"run_id": "sys-a", "qid": "q3", "query": "q3", "answer_text": "a3"},
+        ],
+    )
+    right = _write(
+        tmp_path / "b.jsonl",
+        [
+            {"run_id": "sys-b", "qid": "q1", "query": "q1", "answer_text": "b1"},
+            {"run_id": "sys-b", "qid": "q2", "query": "q2", "answer_text": "b2"},
+            {"run_id": "sys-b", "qid": "q3", "query": "q3", "answer_text": "b3"},
+        ],
+    )
+    output = tmp_path / "tasks.jsonl"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "pi-trec",
+            "materialize",
+            "arena",
+            "--answers",
+            str(left),
+            "--answers",
+            str(right),
+            "--output-file",
+            str(output),
+            "--sample-topics-per-pair",
+            "1",
+            "--sampling-seed",
+            "5",
+        ],
+    )
+
+    main()
+
+    rows = [json.loads(line) for line in output.read_text(encoding="utf-8").splitlines()]
+    assert len(rows) == 1
+    assert rows[0]["metadata"]["qid"] in {"q1", "q2", "q3"}
+
+
+def test_materialize_arena_cli_samples_battles_per_system_per_topic(tmp_path: Path, monkeypatch) -> None:
+    paths = []
+    for run_id in ["sys-a", "sys-b", "sys-c", "sys-d"]:
+        paths.append(
+            _write(
+                tmp_path / f"{run_id}.jsonl",
+                [
+                    {"run_id": run_id, "qid": "q1", "query": "q1", "answer_text": run_id},
+                    {"run_id": run_id, "qid": "q2", "query": "q2", "answer_text": run_id},
+                ],
+            )
+        )
+    output = tmp_path / "tasks.jsonl"
+    argv = ["pi-trec", "materialize", "arena", "--output-file", str(output)]
+    for path in paths:
+        argv.extend(["--answers", str(path)])
+    argv.extend(["--sample-battles-per-system-per-topic", "1", "--sampling-seed", "5"])
+    monkeypatch.setattr(sys, "argv", argv)
+
+    main()
+
+    rows = [json.loads(line) for line in output.read_text(encoding="utf-8").splitlines()]
+    assert len(rows) == 4
 
 
 def test_arena_compare_all_cli_with_fake_pi(tmp_path: Path, monkeypatch) -> None:
