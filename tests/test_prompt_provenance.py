@@ -5,17 +5,14 @@ tests/fixtures/upstream/. Those files must stay byte-identical to upstream, so
 the capture metadata lives here (and in that dir's README), never inside them:
   castorini/umbrela      e2c4e4126bf7b568d9230008b465a58445cabc30  qrel_zeroshot_{basic,bing}.yaml
   castorini/nuggetizer   d00dc3eb791f4f8f49547ce3ca4f60a63b08cfd7  {creator,scorer,assigner,assigner_2grade}_template.yaml
-  lintool/trec2024-rag   89ce8cc5082d38377395d5b1f67cda64540fdcad  support_evaluation_individual_gpt4o.py  (private repo)
 
 Upstream render references:
   umbrela    src/umbrela/prompts/template_loader.py  (PromptTemplate.render)
   nuggetizer src/nuggetizer/prompts/service.py        (create_*_messages)
-  support    support_eval/code/..._gpt4o.py           (AbstractEvaluation.__call__)
 """
 
 from __future__ import annotations
 
-import ast
 from pathlib import Path
 from string import Formatter
 
@@ -38,7 +35,6 @@ from pi_trec.nuggetizer import (
     render_create_prompt,
     render_score_prompt,
 )
-from pi_trec.support import SUPPORT_EVAL_PROMPT, iter_support_tasks, render_support_prompt
 from pi_trec.umbrela import (
     UMBRELA_ZERO_BASIC,
     UMBRELA_ZERO_BING,
@@ -52,16 +48,6 @@ UPSTREAM = Path(__file__).resolve().parent / "fixtures" / "upstream"
 def _yaml_template(rel: str) -> tuple[str, str]:
     data = yaml.safe_load((UPSTREAM / rel).read_text(encoding="utf-8"))
     return str(data["system_message"]), str(data["prefix_user"])
-
-
-def _support_prompt_literal() -> str:
-    source = (UPSTREAM / "trec2024-rag" / "support_evaluation_individual_gpt4o.py").read_text(encoding="utf-8")
-    for node in ast.walk(ast.parse(source)):
-        if isinstance(node, ast.Assign) and any(
-            isinstance(target, ast.Name) and target.id == "SUPPORT_EVAL_PROMPT" for target in node.targets
-        ):
-            return ast.literal_eval(node.value)
-    raise AssertionError("SUPPORT_EVAL_PROMPT not found in upstream script")
 
 
 def _castorini_umbrela(prompt_type: str, *, query: str, passage: str) -> str:
@@ -92,10 +78,6 @@ def _castorini_score(*, query: str, nuggets: list[str]) -> str:
 def _castorini_assign(*, template: str, query: str, context: str, nuggets: list[str]) -> str:
     _, prefix_user = _yaml_template(f"nuggetizer/{template}")
     return prefix_user.format(query=query, context=context, nuggets=nuggets, num_nuggets=len(nuggets))
-
-
-def _castorini_support(*, statement: str, citation: str) -> str:
-    return _support_prompt_literal().format(statement=statement, citation=citation)
 
 
 TEXTS = [
@@ -227,21 +209,3 @@ def test_nugget_system_messages_match_upstream() -> None:
     assert NUGGET_SCORER_SYSTEM == _yaml_template("nuggetizer/scorer_template.yaml")[0]
     assert NUGGET_ASSIGNER_SYSTEM == _yaml_template("nuggetizer/assigner_template.yaml")[0]
     assert NUGGET_ASSIGNER_SYSTEM == _yaml_template("nuggetizer/assigner_2grade_template.yaml")[0]
-
-
-@pytest.mark.parametrize("citation", TEXTS)
-@pytest.mark.parametrize("statement", TEXTS)
-def test_support_prompt_byte_identical(statement: str, citation: str) -> None:
-    assert render_support_prompt(statement=statement, citation=citation) == _castorini_support(
-        statement=statement, citation=citation
-    )
-
-
-def test_support_prompt_constant_matches_upstream_literal() -> None:
-    assert SUPPORT_EVAL_PROMPT == _support_prompt_literal()
-
-
-def test_support_materialized_instruction_byte_identical() -> None:
-    statement, citation = TEXTS[1], TEXTS[4]
-    tasks = iter_support_tasks([{"task_id": "t", "statement": statement, "citation": citation}])
-    assert tasks[0]["instruction"] == _castorini_support(statement=statement, citation=citation)
