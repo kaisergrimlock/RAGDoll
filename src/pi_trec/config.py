@@ -32,11 +32,12 @@ def default_cache_dir() -> Path:
     override = os.environ.get(CACHE_DIR_ENV)
     return Path(override) if override else DEFAULT_CACHE_DIR
 
+
 DEFAULT_WINDOW_SIZE = 10
 DEFAULT_MAX_TRIALS = 4
 
-# `thinking=auto` resolves per model: minimal for gpt-5* (deterministic, fast),
-# otherwise DEFAULT_THINKING. Pass an explicit level to override the profile.
+# `thinking=auto` is available as an explicit per-model profile: minimal for
+# gpt-5* (deterministic, fast), otherwise DEFAULT_THINKING.
 THINKING_AUTO = "auto"
 GPT5_THINKING = "minimal"
 
@@ -220,6 +221,45 @@ class MaterializeAssignInputsConfig(BaseConfig):
 
 
 @dataclass
+class MaterializeArenaConfig(BaseConfig):
+    """Materialize system-vs-system arena judge prompts."""
+
+    answers: list[Path] = dataclasses.field(default_factory=list)
+    answers_dir: Path | None = None
+    output_file: Path | None = None
+    seed: int = DEFAULT_SEED
+    sample_topics_per_pair: int | None = None
+    sample_battles_per_topic: int | None = None
+    sample_battles_per_system_per_topic: float | None = None
+    sampling_seed: int | None = None
+
+    _required: ClassVar[tuple[str, ...]] = ("output_file",)
+
+    def validate(self) -> None:
+        super().validate()
+        if self.answers and self.answers_dir:
+            raise SystemExit("arena materialize requires either --answers or --answers-dir, not both")
+        if not self.answers and self.answers_dir is None:
+            raise SystemExit("arena materialize requires --answers files or --answers-dir")
+        if self.sample_topics_per_pair is not None and self.sample_topics_per_pair <= 0:
+            raise SystemExit("arena materialize --sample-topics-per-pair must be positive")
+        sampling_modes = [
+            self.sample_topics_per_pair is not None,
+            self.sample_battles_per_topic is not None,
+            self.sample_battles_per_system_per_topic is not None,
+        ]
+        if sum(sampling_modes) > 1:
+            raise SystemExit("arena materialize sampling flags are mutually exclusive")
+        if self.sample_battles_per_topic is not None and self.sample_battles_per_topic <= 0:
+            raise SystemExit("arena materialize --sample-battles-per-topic must be positive")
+        if (
+            self.sample_battles_per_system_per_topic is not None
+            and self.sample_battles_per_system_per_topic <= 0
+        ):
+            raise SystemExit("arena materialize --sample-battles-per-system-per-topic must be positive")
+
+
+@dataclass
 class RunConfig(BaseConfig):
     """Base config for commands that run prompts through the Pi local agent."""
 
@@ -231,7 +271,7 @@ class RunConfig(BaseConfig):
     agent_binary: str = "pi"
     provider: str = DEFAULT_PROVIDER
     model: str = DEFAULT_MODEL
-    thinking: str = THINKING_AUTO
+    thinking: str = DEFAULT_THINKING
     system_prompt: str = DEFAULT_SYSTEM_PROMPT
     temperature: float | None = None
     max_concurrency: int = DEFAULT_MAX_CONCURRENCY
@@ -282,6 +322,44 @@ class UmbrelaJudgeConfig(RunConfig):
 @dataclass
 class SupportJudgeConfig(RunConfig):
     include_prompt: bool = False
+
+
+@dataclass
+class ArenaCompareAllConfig(RunConfig):
+    """`arena compare-all`: rank systems from pairwise LLM-judge battles."""
+
+    answers: list[Path] = dataclasses.field(default_factory=list)
+    answers_dir: Path | None = None
+    output_dir: Path | None = None
+    sample_topics_per_pair: int | None = None
+    sample_battles_per_topic: int | None = None
+    sample_battles_per_system_per_topic: float | None = None
+    sampling_seed: int | None = None
+
+    _required: ClassVar[tuple[str, ...]] = ("output_dir",)
+
+    def validate(self) -> None:
+        super().validate()
+        if self.answers and self.answers_dir:
+            raise SystemExit("arena compare-all requires either --answers or --answers-dir, not both")
+        if not self.answers and self.answers_dir is None:
+            raise SystemExit("arena compare-all requires --answers files or --answers-dir")
+        if self.sample_topics_per_pair is not None and self.sample_topics_per_pair <= 0:
+            raise SystemExit("arena compare-all --sample-topics-per-pair must be positive")
+        sampling_modes = [
+            self.sample_topics_per_pair is not None,
+            self.sample_battles_per_topic is not None,
+            self.sample_battles_per_system_per_topic is not None,
+        ]
+        if sum(sampling_modes) > 1:
+            raise SystemExit("arena compare-all sampling flags are mutually exclusive")
+        if self.sample_battles_per_topic is not None and self.sample_battles_per_topic <= 0:
+            raise SystemExit("arena compare-all --sample-battles-per-topic must be positive")
+        if (
+            self.sample_battles_per_system_per_topic is not None
+            and self.sample_battles_per_system_per_topic <= 0
+        ):
+            raise SystemExit("arena compare-all --sample-battles-per-system-per-topic must be positive")
 
 
 @dataclass
@@ -402,7 +480,7 @@ class DoctorConfig(BaseConfig):
 
     agent_binary: str = "pi"
     model: str = DEFAULT_MODEL
-    thinking: str = THINKING_AUTO
+    thinking: str = DEFAULT_THINKING
     agent_state_dir: Path | None = None
     timeout_seconds: float = 120.0
     probe: bool = False
