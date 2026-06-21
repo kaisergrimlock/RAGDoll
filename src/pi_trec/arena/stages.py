@@ -1,0 +1,284 @@
+from __future__ import annotations
+
+import hashlib
+import math
+import random
+from dataclasses import dataclass
+from itertools import combinations
+from pathlib import Path
+from typing import Any
+
+from pi_trec.arena.prompts import render_arena_prompt
+from pi_trec.jsonl import read_jsonl
+
+
+@dataclass(frozen=True)
+class AnswerRecord:
+    run_id: str
+    qid: str
+    query: str
+    answer_text: str
+    source: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class AnswerSet:
+    run_id: str
+    path: Path
+    rows_by_qid: dict[str, AnswerRecord]
+
+    @property
+    def qids(self) -> set[str]:
+        return set(self.rows_by_qid)
+
+
+def _metadata(row: dict[str, Any]) -> dict[str, Any]:
+    return row.get("metadata") if isinstance(row.get("metadata"), dict) else {}
+
+
+def _first_text(*values: Any) -> str:
+    for value in values:
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return ""
+
+
+def qid_of(row: dict[str, Any]) -> str:
+    metadata = _metadata(row)
+    return _first_text(row.get("qid"), row.get("topic_id"), row.get("query_id"), metadata.get("narrative_id"))
+
+
+def run_id_of(row: dict[str, Any]) -> str:
+    metadata = _metadata(row)
+    return _first_text(row.get("run_id"), metadata.get("run_id"))
+
+
+def query_of(row: dict[str, Any]) -> str:
+    metadata = _metadata(row)
+    return _first_text(row.get("query"), row.get("topic"), metadata.get("narrative"), metadata.get("title"))
+
+
+def _answer_sentence_text(answer: Any) -> list[str]:
+    if isinstance(answer, str):
+        return [answer.strip()] if answer.strip() else []
+    if not isinstance(answer, list):
+        return []
+    texts: list[str] = []
+    for item in answer:
+        if isinstance(item, dict):
+            text = item.get("text")
+        else:
+            text = item
+        if isinstance(text, str) and text.strip():
+            texts.append(text.strip())
+    return texts
+
+
+def answer_text_of(row: dict[str, Any]) -> str:
+    answer_text = row.get("answer_text")
+    if isinstance(answer_text, str) and answer_text.strip():
+        return answer_text.strip()
+    return " ".join(_answer_sentence_text(row.get("answer"))).strip()
+
+
+def load_answer_set(path: Path) -> AnswerSet:
+    rows_by_qid: dict[str, AnswerRecord] = {}
+    run_id: str | None = None
+    for row in read_jsonl(path):
+        row_run_id = run_id_of(row)
+        qid = qid_of(row)
+        query = query_of(row)
+        answer_text = answer_text_of(row)
+        if not row_run_id:
+            raise ValueError(f"{path}: missing run_id or metadata.run_id")
+        if not qid:
+            raise ValueError(f"{path}: missing qid/topic_id/metadata.narrative_id")
+        if not query:
+            raise ValueError(f"{path}:{qid}: missing query/topic/metadata narrative/title")
+        if not answer_text:
+            raise ValueError(f"{path}:{qid}: missing answer_text or answer[].text")
+        if run_id is None:
+            run_id = row_run_id
+        elif row_run_id != run_id:
+            raise ValueError(f"{path}: inconsistent run_id values: {run_id!r} and {row_run_id!r}")
+        if qid in rows_by_qid:
+            raise ValueError(f"{path}: duplicate qid {qid!r}")
+        rows_by_qid[qid] = AnswerRecord(
+            run_id=row_run_id,
+            qid=qid,
+            query=query,
+            answer_text=answer_text,
+            source=row,
+        )
+    if run_id is None:
+        raise ValueError(f"{path}: no answer rows found")
+    return AnswerSet(run_id=run_id, path=path, rows_by_qid=rows_by_qid)
+
+
+def load_answer_sets(paths: list[Path]) -> list[AnswerSet]:
+    sets = [load_answer_set(path) for path in paths]
+    seen: set[str] = set()
+    for answer_set in sets:
+        if answer_set.run_id in seen:
+            raise ValueError(f"duplicate run_id across answer files: {answer_set.run_id!r}")
+        seen.add(answer_set.run_id)
+    return sets
+
+
+def assistant_order(seed: int, run_a: str, run_b: str, qid: str) -> tuple[str, str]:
+    first, second = sorted((run_a, run_b))
+    key = f"{seed}\x00{first}\x00{second}\x00{qid}".encode()
+    bit = hashlib.sha256(key).digest()[0] % 2
+    return (run_a, run_b) if bit == 0 else (run_b, run_a)
+
+
+def _task_id(run_a: str, run_b: str, qid: str) -> str:
+    return f"arena:{run_a}:{run_b}:{qid}"
+
+
+def sampled_pair_qids(qids: list[str], *, run_a: str, run_b: str, k: int | None, seed: int) -> list[str]:
+    if k is None or len(qids) <= k:
+        return qids
+    if k <= 0:
+        raise ValueError("sample_topics_per_pair must be positive")
+    first, second = sorted((run_a, run_b))
+    key = f"{seed}\x00{first}\x00{second}".encode()
+    rng = random.Random(int.from_bytes(hashlib.sha256(key).digest()[:8], "big"))
+    return sorted(rng.sample(qids, k))
+
+
+def battles_for_system_degree(n_systems: int, battles_per_system: float | None) -> int | None:
+    if battles_per_system is None:
+        return None
+    if battles_per_system <= 0:
+        raise ValueError("sample_battles_per_system_per_topic must be positive")
+    return math.ceil(n_systems * battles_per_system / 2)
+
+
+def sampled_topic_pairs(
+    pairs: list[tuple[str, str]],
+    *,
+    qid: str,
+    battles_per_topic: int | None,
+    seed: int,
+) -> list[tuple[str, str]]:
+    if battles_per_topic is None or len(pairs) <= battles_per_topic:
+        return pairs
+    if battles_per_topic <= 0:
+        raise ValueError("sample_battles_per_topic must be positive")
+
+    available = set(pairs)
+    systems = sorted({run_id for pair in pairs for run_id in pair})
+    key = f"{seed}\x00{qid}\x00{battles_per_topic}".encode()
+    rng = random.Random(int.from_bytes(hashlib.sha256(key).digest()[:8], "big"))
+    rng.shuffle(systems)
+
+    sampled: set[tuple[str, str]] = set()
+    if battles_per_topic >= len(systems):
+        for index, run_a in enumerate(systems):
+            run_b = systems[(index + 1) % len(systems)]
+            sampled.add(tuple(sorted((run_a, run_b))))
+    elif battles_per_topic >= math.ceil(len(systems) / 2):
+        for index in range(0, len(systems) - 1, 2):
+            sampled.add(tuple(sorted((systems[index], systems[index + 1]))))
+        if len(systems) % 2:
+            sampled.add(tuple(sorted((systems[-1], systems[0]))))
+
+    sampled &= available
+    remaining = [pair for pair in pairs if pair not in sampled]
+    needed = battles_per_topic - len(sampled)
+    sampled.update(rng.sample(remaining, needed))
+    return sorted(sampled)
+
+
+def _arena_task(left: AnswerSet, right: AnswerSet, qid: str, *, seed: int) -> dict[str, Any]:
+    left_answer = left.rows_by_qid[qid]
+    right_answer = right.rows_by_qid[qid]
+    if left_answer.query != right_answer.query:
+        raise ValueError(f"query mismatch for qid {qid!r} between {left.run_id!r} and {right.run_id!r}")
+    assistant_a_run_id, assistant_b_run_id = assistant_order(seed, left.run_id, right.run_id, qid)
+    by_run_id = {left.run_id: left_answer, right.run_id: right_answer}
+    answer_a = by_run_id[assistant_a_run_id]
+    answer_b = by_run_id[assistant_b_run_id]
+    return {
+        "task_id": _task_id(left.run_id, right.run_id, qid),
+        "evaluator": "arena",
+        "system_prompt": "",
+        "instruction": render_arena_prompt(
+            query=left_answer.query,
+            answer_a=answer_a.answer_text,
+            answer_b=answer_b.answer_text,
+        ),
+        "metadata": {
+            "pair": [left.run_id, right.run_id],
+            "qid": qid,
+            "query": left_answer.query,
+            "assistant_a_run_id": assistant_a_run_id,
+            "assistant_b_run_id": assistant_b_run_id,
+        },
+    }
+
+
+def iter_arena_tasks(
+    answer_sets: list[AnswerSet],
+    *,
+    seed: int,
+    sample_topics_per_pair: int | None = None,
+    sample_battles_per_topic: int | None = None,
+    sample_battles_per_system_per_topic: float | None = None,
+    sampling_seed: int | None = None,
+) -> list[dict[str, Any]]:
+    tasks: list[dict[str, Any]] = []
+    sample_seed = seed if sampling_seed is None else sampling_seed
+    by_run_id = {answer_set.run_id: answer_set for answer_set in answer_sets}
+    if sample_battles_per_topic is not None or sample_battles_per_system_per_topic is not None:
+        qids = sorted({qid for answer_set in answer_sets for qid in answer_set.qids})
+        for qid in qids:
+            pairs = [
+                (left.run_id, right.run_id)
+                for left, right in combinations(answer_sets, 2)
+                if qid in left.rows_by_qid and qid in right.rows_by_qid
+            ]
+            battles_per_topic = sample_battles_per_topic
+            if sample_battles_per_system_per_topic is not None:
+                n_systems = len({run_id for pair in pairs for run_id in pair})
+                battles_per_topic = battles_for_system_degree(n_systems, sample_battles_per_system_per_topic)
+            for run_a, run_b in sampled_topic_pairs(
+                pairs,
+                qid=qid,
+                battles_per_topic=battles_per_topic,
+                seed=sample_seed,
+            ):
+                tasks.append(_arena_task(by_run_id[run_a], by_run_id[run_b], qid, seed=seed))
+        return tasks
+
+    for left, right in combinations(answer_sets, 2):
+        shared_qids = sorted(left.qids & right.qids)
+        shared_qids = sampled_pair_qids(
+            shared_qids,
+            run_a=left.run_id,
+            run_b=right.run_id,
+            k=sample_topics_per_pair,
+            seed=sample_seed,
+        )
+        for qid in shared_qids:
+            tasks.append(_arena_task(left, right, qid, seed=seed))
+    return tasks
+
+
+def coverage_rows(answer_sets: list[AnswerSet]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for left, right in combinations(answer_sets, 2):
+        shared = left.qids & right.qids
+        rows.append(
+            {
+                "run_a": left.run_id,
+                "run_b": right.run_id,
+                "run_a_topics": len(left.qids),
+                "run_b_topics": len(right.qids),
+                "shared_topics": len(shared),
+                "run_a_only_topics": len(left.qids - right.qids),
+                "run_b_only_topics": len(right.qids - left.qids),
+            }
+        )
+    return rows
