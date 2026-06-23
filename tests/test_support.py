@@ -2,13 +2,20 @@ import asyncio
 import json
 from pathlib import Path
 
+import yaml
+
 from pi_trec.config import SupportJudgeConfig
 from pi_trec.support import (
+    SUPPORT_EVAL_PROMPT,
     iter_support_tasks,
     judge,
     parse_support_label,
     render_support_prompt,
 )
+
+
+UPSTREAM = Path(__file__).resolve().parent / "fixtures" / "upstream"
+SUPPORT_PROMPT_FIXTURE = UPSTREAM / "trec2024-rag" / "support_evaluation_codex_gpt5_5.yaml"
 
 
 def _fake_agent(tmp_path: Path, output_text: str) -> Path:
@@ -17,6 +24,10 @@ def _fake_agent(tmp_path: Path, output_text: str) -> Path:
     agent.write_text(f"#!/usr/bin/env python3\nprint({json.dumps(payload)})\n", encoding="utf-8")
     agent.chmod(0o755)
     return agent
+
+
+def test_support_prompt_matches_fixture() -> None:
+    assert SUPPORT_EVAL_PROMPT == yaml.safe_load(SUPPORT_PROMPT_FIXTURE.read_text(encoding="utf-8"))["prefix_user"]
 
 
 def test_support_prompt_includes_sentence_context() -> None:
