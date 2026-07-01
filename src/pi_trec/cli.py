@@ -53,7 +53,12 @@ from pi_trec.config import (
     RubricEvalConfig,
     RubricGradeConfig,
     RubricScoreConfig,
+    SupportAssembleConfig,
     SupportJudgeConfig,
+    SupportMetricRowsConfig,
+    SupportMetricsConfig,
+    SupportResolveReferencesConfig,
+    SupportSummarizeConfig,
     UmbrelaJudgeConfig,
     ValidateConfig,
     VisualizeAlignmentConfig,
@@ -279,6 +284,80 @@ def build_parser() -> argparse.ArgumentParser:
     add_runner_args(support_judge)
     support_judge.add_argument("--include-prompt", action="store_true", default=SUPPRESS)
     finish(support_judge, config_cls=SupportJudgeConfig, handler=support.judge)
+    support_resolve = support_subparsers.add_parser(
+        "resolve-references", help="Resolve RAG answer references to passage text for support judging."
+    )
+    support_resolve.add_argument("--input-file", type=Path, default=SUPPRESS)
+    support_resolve.add_argument("--output-file", type=Path, default=SUPPRESS)
+    support_resolve.add_argument(
+        "--pyserini-api",
+        default=SUPPRESS,
+        help="Pyserini REST API base URL, e.g. http://api.castorini.uwaterloo.ca.",
+    )
+    support_resolve.add_argument("--pyserini-index", default=SUPPRESS)
+    support_resolve.add_argument("--read-limit", type=int, default=SUPPRESS)
+    support_resolve.add_argument("--read-word-limit", type=int, default=SUPPRESS)
+    support_resolve.add_argument("--token-env", default=SUPPRESS)
+    finish(support_resolve, config_cls=SupportResolveReferencesConfig, handler=support.resolve_references)
+    support_metrics = support_subparsers.add_parser(
+        "metrics", help="Compute weighted/hard support precision and recall by topic/run."
+    )
+    support_metrics.add_argument("--input-file", type=Path, default=SUPPRESS)
+    support_metrics.add_argument("--output-file", type=Path, default=SUPPRESS)
+    finish(support_metrics, config_cls=SupportMetricsConfig, handler=support.compute_metrics)
+    support_metric_rows = support_subparsers.add_parser(
+        "metric-rows", help="Convert support metrics JSONL to run topic metric score rows."
+    )
+    support_metric_rows.add_argument("--input-file", type=Path, default=SUPPRESS)
+    support_metric_rows.add_argument("--output-file", type=Path, default=SUPPRESS)
+    support_metric_rows.add_argument(
+        "--metric",
+        action="append",
+        dest="metrics",
+        default=SUPPRESS,
+        choices=[
+            "weighted_precision_first_citation",
+            "weighted_recall_first_citation",
+            "weighted_precision_all_judged_citations",
+            "weighted_recall_all_judged_citations",
+            "hard_precision",
+            "hard_recall",
+        ],
+        help="Metric column to emit; repeat to control order. Defaults to first/all weighted precision and recall.",
+    )
+    finish(support_metric_rows, config_cls=SupportMetricRowsConfig, handler=support.write_metric_rows)
+    support_assemble = support_subparsers.add_parser(
+        "assemble", help="Build human-style support assignment JSONL from answers and parsed judgments."
+    )
+    support_assemble.add_argument("--answers-file", type=Path, default=SUPPRESS)
+    support_assemble.add_argument("--judgments", type=Path, action="append", default=SUPPRESS)
+    support_assemble.add_argument("--output-file", type=Path, default=SUPPRESS)
+    support_assemble.add_argument("--run-id", default=SUPPRESS, help="Fallback run ID when absent from answers.")
+    finish(support_assemble, config_cls=SupportAssembleConfig, handler=support.assemble)
+    support_summarize = support_subparsers.add_parser(
+        "summarize", help="Create support assignments, metrics JSONL, and metric rows for runfiles."
+    )
+    summarize_inputs = support_summarize.add_mutually_exclusive_group()
+    summarize_inputs.add_argument("--answers", type=Path, action="append", default=SUPPRESS)
+    summarize_inputs.add_argument("--answers-dir", type=Path, default=SUPPRESS)
+    support_summarize.add_argument("--judgments-root", type=Path, default=SUPPRESS)
+    support_summarize.add_argument("--output-dir", type=Path, default=SUPPRESS)
+    support_summarize.add_argument(
+        "--metric",
+        action="append",
+        dest="metrics",
+        default=SUPPRESS,
+        choices=[
+            "weighted_precision_first_citation",
+            "weighted_recall_first_citation",
+            "weighted_precision_all_judged_citations",
+            "weighted_recall_all_judged_citations",
+            "hard_precision",
+            "hard_recall",
+        ],
+        help="Metric column to emit in support_metric_rows.txt; repeat to control order.",
+    )
+    finish(support_summarize, config_cls=SupportSummarizeConfig, handler=support.summarize)
 
     arena_parser = subparsers.add_parser("arena", help="Run Search Arena-style system comparisons.")
     arena_subparsers = arena_parser.add_subparsers(dest="arena_command", required=True)

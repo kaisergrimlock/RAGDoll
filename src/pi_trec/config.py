@@ -325,6 +325,83 @@ class SupportJudgeConfig(RunConfig):
 
 
 @dataclass
+class SupportResolveReferencesConfig(FileIOConfig):
+    """`support resolve-references`: attach cited passage text to RAG answers."""
+
+    pyserini_api: str | None = None
+    pyserini_index: str | None = None
+    read_limit: int = 200
+    read_word_limit: int = 4096
+    token_env: str = "PYSERINI_API_TOKEN"
+
+    def validate(self) -> None:
+        super().validate()
+        if self.pyserini_index is None:
+            raise SystemExit("support resolve-references requires --pyserini-index")
+
+
+@dataclass
+class SupportMetricsConfig(FileIOConfig):
+    """`support metrics`: score support judgments by topic/run."""
+
+
+@dataclass
+class SupportMetricRowsConfig(FileIOConfig):
+    """`support metric-rows`: convert support metric JSONL to run/topic/metric rows."""
+
+    metrics: list[str] = dataclasses.field(
+        default_factory=lambda: [
+            "weighted_precision_first_citation",
+            "weighted_recall_first_citation",
+            "weighted_precision_all_judged_citations",
+            "weighted_recall_all_judged_citations",
+        ]
+    )
+
+
+@dataclass
+class SupportAssembleConfig(BaseConfig):
+    """`support assemble`: build human-style assignment JSONL from answers + judgments."""
+
+    answers_file: Path | None = None
+    judgments: list[Path] = dataclasses.field(default_factory=list)
+    output_file: Path | None = None
+    run_id: str | None = None
+
+    _required: ClassVar[tuple[str, ...]] = ("answers_file", "output_file")
+
+    def validate(self) -> None:
+        super().validate()
+        if not self.judgments:
+            raise SystemExit("support assemble requires at least one --judgments file or directory")
+
+
+@dataclass
+class SupportSummarizeConfig(BaseConfig):
+    """`support summarize`: assignments + metrics + metric rows for runfiles."""
+
+    answers: list[Path] = dataclasses.field(default_factory=list)
+    answers_dir: Path | None = None
+    judgments_root: Path | None = None
+    output_dir: Path | None = None
+    metrics: list[str] = dataclasses.field(
+        default_factory=lambda: [
+            "weighted_precision_first_citation",
+            "weighted_recall_first_citation",
+            "weighted_precision_all_judged_citations",
+            "weighted_recall_all_judged_citations",
+        ]
+    )
+
+    _required: ClassVar[tuple[str, ...]] = ("judgments_root", "output_dir")
+
+    def validate(self) -> None:
+        super().validate()
+        if bool(self.answers) == bool(self.answers_dir):
+            raise SystemExit("support summarize requires exactly one of --answers or --answers-dir")
+
+
+@dataclass
 class ArenaCompareAllConfig(RunConfig):
     """`arena compare-all`: rank systems from pairwise LLM-judge battles."""
 

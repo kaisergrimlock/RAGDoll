@@ -89,22 +89,192 @@ uv run pi-trec materialize nugget-agentic-create \
 
 ## Support Assessment
 
-Run support judgment on pre-resolved statement/citation pairs. Direct rows may
-include `sentence_context`, the full generated response containing the judged
-sentence. If it is omitted, Pi-TREC renders the judged sentence as the full
-context. For TREC answer rows, Pi-TREC builds the context from the full
-`answer` list and bolds the target sentence.
+Support assessment starts from official TREC RAG answer rows. Each JSONL row is
+one `(narrative_id, run_id)` answer. The `answer` field contains sentence text
+and zero-indexed citation references; `references` maps those citation indices
+to document IDs.
+
+```json
+{
+  "metadata": {
+    "team_id": "example-team",
+    "run_id": "example-run",
+    "type": "automatic",
+    "narrative_id": "14",
+    "title": "Example topic",
+    "narrative": "Example topic narrative."
+  },
+  "references": ["doc-a"],
+  "answer": [
+    {
+      "text": "Answer sentence.",
+      "citations": [0]
+    }
+  ]
+}
+```
+
+First resolve the cited document IDs to passage text. With a Pyserini HTTP API:
+
+```bash
+uv run pi-trec support resolve-references \
+  --input-file answers.jsonl \
+  --output-file answers.resolved.jsonl \
+  --pyserini-api http://api.castorini.uwaterloo.ca \
+  --pyserini-index msmarco-v2.1-doc-segmented
+```
+
+Or directly with a Pyserini index. The index can be a local Lucene index path
+or a Pyserini prebuilt index name:
+
+```bash
+uv run pi-trec support resolve-references \
+  --input-file answers.jsonl \
+  --output-file answers.resolved.jsonl \
+  --pyserini-index msmarco-v2.1-doc-segmented
+```
+
+The resolved file preserves the original row and adds `topic_id`, `run_id`, and
+`segments`, where `segments` maps each reference document ID to the text that
+the support judge will read.
+
+```json
+{
+  "topic_id": "14",
+  "run_id": "example-run",
+  "references": ["doc-a"],
+  "segments": {
+    "doc-a": "Full cited passage text."
+  },
+  "answer": [
+    {
+      "text": "Answer sentence.",
+      "citations": [0]
+    }
+  ]
+}
+```
+
+Run support judgment on the resolved answer file:
 
 ```bash
 uv run pi-trec support judge \
-  --input-file examples/support.requests.jsonl \
-  --output-file results/support.jsonl \
+  --input-file answers.resolved.jsonl \
+  --output-file judgments.parsed.jsonl \
   --raw-events-dir results/support.raw-events \
   --overwrite
 ```
 
-The support prompt follows the TREC RAG Task assessor-facing support
-instructions, using `Cited Passage`, `Sentence`, and `Sentence Context` fields.
+This writes one row per judged sentence/citation pair:
+
+```json
+{
+  "task_id": "example-run:14:s0:c0",
+  "statement": "Answer sentence.",
+  "citation": "Full cited passage text.",
+  "support_label": "FS",
+  "raw_output": "Full Support",
+  "status": "completed",
+  "metadata": {
+    "topic_id": "14",
+    "run_id": "example-run",
+    "sentence_index": 0,
+    "citation_index": 0,
+    "docid": "doc-a"
+  }
+}
+```
+
+Assemble the parsed judgments back onto the original answer structure:
+
+```bash
+uv run pi-trec support assemble \
+  --answers-file answers.resolved.jsonl \
+  --judgments judgments.parsed.jsonl \
+  --output-file support_assignments.jsonl
+```
+
+The assignment file is one row per `(topic_id, run_id)`:
+
+```json
+{
+  "topic_id": "14",
+  "narrative_id": "14",
+  "run_id": "example-run",
+  "sentences": [
+    {
+      "sentenceID": 0,
+      "text": "Answer sentence.",
+      "citations": [
+        {
+          "citationID": 0,
+          "reference": "doc-a",
+          "support": "2"
+        }
+      ]
+    }
+  ]
+}
+```
+
+Support values are `2` = full support, `1` = partial support, `0` = no support,
+and `-1` = missing, failed, or unparseable.
+
+Compute run/topic support metrics:
+
+```bash
+uv run pi-trec support metrics \
+  --input-file support_assignments.jsonl \
+  --output-file support_metrics.jsonl
+```
+
+This writes one score row per `(topic_id, run_id)`:
+
+```json
+{
+  "topic_id": "14",
+  "run_id": "example-run",
+  "weighted_precision_first_citation": 1.0,
+  "weighted_recall_first_citation": 1.0,
+  "weighted_precision_all_judged_citations": 1.0,
+  "weighted_recall_all_judged_citations": 1.0,
+  "hard_precision": 1.0,
+  "hard_recall": 1.0,
+  "sentences": 1
+}
+```
+
+Optionally export metric rows:
+
+```bash
+uv run pi-trec support metric-rows \
+  --input-file support_metrics.jsonl \
+  --output-file support_metric_rows.txt
+```
+
+```text
+example-run 14 weighted_precision_first_citation 1
+example-run 14 weighted_recall_first_citation 1
+example-run 14 weighted_precision_all_judged_citations 1
+example-run 14 weighted_recall_all_judged_citations 1
+```
+
+For many resolved answer files, `support summarize` combines assignment
+assembly, metric computation, and metric-row export after judgments already
+exist:
+
+```bash
+uv run pi-trec support summarize \
+  --answers-dir answers/ \
+  --judgments-root judgments/ \
+  --output-dir support_scores/
+```
+
+It writes `support_assignments.jsonl`, `support_metrics.jsonl`, and
+`support_metric_rows.txt` under the output directory.
+
+The support prompt asks the judge to label a `Statement` against its cited
+`Citation` as `Full Support`, `Partial Support`, or `No Support`.
 
 ## Isolated Rubric Scoring
 
@@ -316,7 +486,7 @@ Pi-TREC can expose a Pyserini HTTP endpoint as the Pine-compatible `pi-search`
 
 ```bash
 uv run pi-trec serve pyserini-wrapper \
-  --pyserini-base-url http://127.0.0.1:8081 \
+  --pyserini-base-url http://api.castorini.uwaterloo.ca \
   --pyserini-index msmarco-v2.1-doc-segmented \
   --port 8092 \
   --search-word-limit 512 \
