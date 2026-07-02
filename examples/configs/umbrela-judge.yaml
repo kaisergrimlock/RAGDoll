@@ -1,4 +1,4 @@
-# Example config for: pi-trec umbrela judge --config examples/configs/umbrela-judge.yaml
+# Example config for: ragdoll umbrela judge --config examples/configs/umbrela-judge.yaml
 # Keys are the snake_case field names (the CLI flag without the leading "--").
 # Explicit CLI flags override anything set here.
 input_file: examples/umbrela.requests.jsonl

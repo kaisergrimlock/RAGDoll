@@ -1,4 +1,4 @@
-"""Adapters between TREC RAG artifacts and pi-trec nugget JSONL."""
+"""Adapters between TREC RAG artifacts and ragdoll nugget JSONL."""
 
 from __future__ import annotations
 
@@ -7,10 +7,10 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
-from pi_trec.config import MaterializeAssignInputsConfig, MaterializeTrecAnswersConfig
-from pi_trec.jsonl import read_jsonl, write_jsonl
+from ragdoll.config import MaterializeAssignInputsConfig, MaterializeTrecAnswersConfig
+from ragdoll.jsonl import read_jsonl, write_jsonl
 
-logger = logging.getLogger("pi_trec.trec_io")
+logger = logging.getLogger("ragdoll.trec_io")
 
 
 def _qid(row: dict[str, Any]) -> str:

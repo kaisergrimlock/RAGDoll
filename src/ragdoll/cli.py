@@ -1,4 +1,4 @@
-"""Command-line interface for pi-trec."""
+"""Command-line interface for ragdoll."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ import logging
 from argparse import SUPPRESS
 from pathlib import Path
 
-from pi_trec import (
+from ragdoll import (
     arena,
     nuggetizer,
     pyserini_wrapper,
@@ -19,16 +19,16 @@ from pi_trec import (
     trec_io,
     umbrela,
 )
-from pi_trec import (
+from ragdoll import (
     cost as cost_mod,
 )
-from pi_trec import (
+from ragdoll import (
     doctor as doctor_mod,
 )
-from pi_trec import (
+from ragdoll import (
     validate as validate_mod,
 )
-from pi_trec.config import (
+from ragdoll.config import (
     ArenaCompareAllConfig,
     BaseConfig,
     CostConfig,
@@ -65,8 +65,8 @@ from pi_trec.config import (
     load_config_file,
     load_env_file,
 )
-from pi_trec.runner import run_task_rows
-from pi_trec.visual import alignment as visual_alignment
+from ragdoll.runner import run_task_rows
+from ragdoll.visual import alignment as visual_alignment
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -435,7 +435,7 @@ def add_runner_args(parser: argparse.ArgumentParser, *, include_input_file: bool
         "--cache-dir",
         type=Path,
         default=SUPPRESS,
-        help="Reuse identical prompt results from this dir. Defaults to .cache/pi-trec.",
+        help="Reuse identical prompt results from this dir. Defaults to .cache/ragdoll.",
     )
     cache_group.add_argument(
         "--no-cache",

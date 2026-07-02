@@ -6,8 +6,8 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from pi_trec.config import DoctorConfig, LocalAgentConfig, resolve_thinking
-from pi_trec.runner import AGENT_STATE_FILENAMES, default_agent_state_dir, run_prompt
+from ragdoll.config import DoctorConfig, LocalAgentConfig, resolve_thinking
+from ragdoll.runner import AGENT_STATE_FILENAMES, default_agent_state_dir, run_prompt
 
 
 def _resolve_binary(agent_binary: str) -> str | None:
@@ -42,7 +42,7 @@ async def doctor(config: DoctorConfig) -> None:
         else:
             thinking = resolve_thinking(config.model, config.thinking)
             print(f"[..]   probing {config.model} (thinking={thinking}, timeout={config.timeout_seconds:g}s) ...")
-            with tempfile.TemporaryDirectory(prefix="pi-trec-doctor-") as tmp:
+            with tempfile.TemporaryDirectory(prefix="ragdoll-doctor-") as tmp:
                 result = await run_prompt(
                     task_id="doctor-probe",
                     evaluator="doctor",

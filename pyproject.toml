@@ -1,5 +1,5 @@
 [project]
-name = "pi-trec"
+name = "ragdoll"
 version = "0.1.0"
 description = "Private Pi/Codex runner for RAG evaluation prompts"
 readme = "README.md"
@@ -17,7 +17,7 @@ viz = [
 ]
 
 [project.scripts]
-pi-trec = "pi_trec.cli:main"
+ragdoll = "ragdoll.cli:main"
 
 [dependency-groups]
 dev = [

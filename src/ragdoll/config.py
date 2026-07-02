@@ -1,4 +1,4 @@
-"""Typed configuration objects for every pi-trec subcommand.
+"""Typed configuration objects for every ragdoll subcommand.
 
 Single root of the package import graph: depends only on the standard library
 (plus PyYAML, imported lazily). Configs merge dataclass defaults, an optional
@@ -23,9 +23,9 @@ DEFAULT_MAX_CONCURRENCY = 8
 DEFAULT_SYSTEM_PROMPT = ""
 DEFAULT_SEED = 13
 # Caching is on by default at this gitignored path; disable per-run with --no-cache.
-# Override the location with PI_TREC_CACHE_DIR (tests point it at a temp dir).
-DEFAULT_CACHE_DIR = Path(".cache/pi-trec")
-CACHE_DIR_ENV = "PI_TREC_CACHE_DIR"
+# Override the location with RAGDOLL_CACHE_DIR (tests point it at a temp dir).
+DEFAULT_CACHE_DIR = Path(".cache/ragdoll")
+CACHE_DIR_ENV = "RAGDOLL_CACHE_DIR"
 
 
 def default_cache_dir() -> Path:

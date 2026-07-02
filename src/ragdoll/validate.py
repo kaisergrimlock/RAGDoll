@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from pi_trec.config import ValidateConfig
+from ragdoll.config import ValidateConfig
 
 KINDS = ("create", "nuggets", "answers", "assign", "assignment")
 _MAX_ERRORS = 50

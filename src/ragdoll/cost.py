@@ -7,8 +7,8 @@ import json
 from pathlib import Path
 from typing import Any
 
-from pi_trec.config import CostConfig, model_name
-from pi_trec.runner import extract_usage
+from ragdoll.config import CostConfig, model_name
+from ragdoll.runner import extract_usage
 
 # USD per 1M tokens, keyed by bare model name. Empty by default on purpose:
 # fill in verified prices or pass --input-price/--output-price at call time.
