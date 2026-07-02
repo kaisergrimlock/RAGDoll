@@ -12,8 +12,8 @@ from pathlib import Path
 
 from ragdoll import (
     arena,
+    castorini_wrapper,
     nuggetizer,
-    pyserini_wrapper,
     rubric,
     support,
     trec_io,
@@ -31,6 +31,7 @@ from ragdoll import (
 from ragdoll.config import (
     ArenaCompareAllConfig,
     BaseConfig,
+    CastoriniServeConfig,
     CostConfig,
     DoctorConfig,
     LocalAgentRunConfig,
@@ -48,7 +49,6 @@ from ragdoll.config import (
     NuggetCreateConfig,
     NuggetEvalConfig,
     NuggetMetricsConfig,
-    PyseriniServeConfig,
     RubricAuthorConfig,
     RubricEvalConfig,
     RubricGradeConfig,
@@ -81,23 +81,23 @@ def build_parser() -> argparse.ArgumentParser:
 
     serve = subparsers.add_parser("serve", help="Serve helper endpoints for Pi RAG evaluation runs.")
     serve_subparsers = serve.add_subparsers(dest="serve_command", required=True)
-    pyserini = serve_subparsers.add_parser(
-        "pyserini-wrapper",
-        help="Wrap a Pyserini HTTP endpoint as the pi-search http-json backend contract.",
+    castorini = serve_subparsers.add_parser(
+        "castorini-wrapper",
+        help="Wrap a search API endpoint as the pi-search http-json backend contract.",
     )
-    pyserini.add_argument("--pyserini-base-url", default=SUPPRESS)
-    pyserini.add_argument("--pyserini-index", default=SUPPRESS)
-    pyserini.add_argument("--host", default=SUPPRESS)
-    pyserini.add_argument("--port", type=int, default=SUPPRESS)
-    pyserini.add_argument("--backend-id", default=SUPPRESS)
-    pyserini.add_argument("--default-limit", type=int, default=SUPPRESS)
-    pyserini.add_argument("--max-page-size", type=int, default=SUPPRESS)
-    pyserini.add_argument("--read-limit", type=int, default=SUPPRESS)
-    pyserini.add_argument("--search-word-limit", type=int, default=SUPPRESS)
-    pyserini.add_argument("--read-word-limit", type=int, default=SUPPRESS)
-    pyserini.add_argument("--token-env", default=SUPPRESS)
-    pyserini.add_argument("--print-config", action="store_true", default=SUPPRESS)
-    finish(pyserini, config_cls=PyseriniServeConfig, handler=pyserini_wrapper.serve_pyserini_wrapper)
+    castorini.add_argument("--api-base-url", default=SUPPRESS)
+    castorini.add_argument("--index", default=SUPPRESS)
+    castorini.add_argument("--host", default=SUPPRESS)
+    castorini.add_argument("--port", type=int, default=SUPPRESS)
+    castorini.add_argument("--backend-id", default=SUPPRESS)
+    castorini.add_argument("--default-limit", type=int, default=SUPPRESS)
+    castorini.add_argument("--max-page-size", type=int, default=SUPPRESS)
+    castorini.add_argument("--read-limit", type=int, default=SUPPRESS)
+    castorini.add_argument("--search-word-limit", type=int, default=SUPPRESS)
+    castorini.add_argument("--read-word-limit", type=int, default=SUPPRESS)
+    castorini.add_argument("--token-env", default=SUPPRESS)
+    castorini.add_argument("--print-config", action="store_true", default=SUPPRESS)
+    finish(castorini, config_cls=CastoriniServeConfig, handler=castorini_wrapper.serve_castorini_wrapper)
 
     materialize = subparsers.add_parser("materialize", help="Materialize evaluator prompts without running Pi.")
     materialize_subparsers = materialize.add_subparsers(dest="materialize_command", required=True)
@@ -290,11 +290,11 @@ def build_parser() -> argparse.ArgumentParser:
     support_resolve.add_argument("--input-file", type=Path, default=SUPPRESS)
     support_resolve.add_argument("--output-file", type=Path, default=SUPPRESS)
     support_resolve.add_argument(
-        "--pyserini-api",
+        "--api-base-url",
         default=SUPPRESS,
-        help="Pyserini REST API base URL, e.g. http://api.castorini.uwaterloo.ca.",
+        help="Search API base URL, e.g. http://api.castorini.uwaterloo.ca.",
     )
-    support_resolve.add_argument("--pyserini-index", default=SUPPRESS)
+    support_resolve.add_argument("--index", default=SUPPRESS)
     support_resolve.add_argument("--read-limit", type=int, default=SUPPRESS)
     support_resolve.add_argument("--read-word-limit", type=int, default=SUPPRESS)
     support_resolve.add_argument("--token-env", default=SUPPRESS)

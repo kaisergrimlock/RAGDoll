@@ -59,7 +59,7 @@ role split is visible before execution.
 
 Agentically create nuggets by giving Pi the same search/read-document tool style
 used by Pine. The input contains `query` plus optional starting `nuggets`; the
-agent searches the wrapped Pyserini corpus, reads documents, returns an updated
+agent searches the wrapped search corpus, reads documents, returns an updated
 nugget list, and RAGDoll scores that final list with the existing Nuggetizer
 scorer prompt:
 
@@ -114,14 +114,14 @@ to document IDs.
 }
 ```
 
-First resolve the cited document IDs to passage text. With a Pyserini HTTP API:
+First resolve the cited document IDs to passage text. With an HTTP search API:
 
 ```bash
 uv run ragdoll support resolve-references \
   --input-file answers.jsonl \
   --output-file answers.resolved.jsonl \
-  --pyserini-api http://api.castorini.uwaterloo.ca \
-  --pyserini-index msmarco-v2.1-doc-segmented
+  --api-base-url http://api.castorini.uwaterloo.ca \
+  --index msmarco-v2.1-doc-segmented
 ```
 
 Or directly with a Pyserini index. The index can be a local Lucene index path
@@ -131,7 +131,7 @@ or a Pyserini prebuilt index name:
 uv run ragdoll support resolve-references \
   --input-file answers.jsonl \
   --output-file answers.resolved.jsonl \
-  --pyserini-index msmarco-v2.1-doc-segmented
+  --index msmarco-v2.1-doc-segmented
 ```
 
 The resolved file preserves the original row and adds `topic_id`, `run_id`, and
@@ -479,15 +479,15 @@ Required fields such as `input_file` and `output_file` may be supplied through
 either the YAML file or CLI flags. Unknown YAML keys are ignored, so one shared
 file can hold settings for several commands.
 
-## Pyserini Wrapper
+## Castorini Wrapper
 
-RAGDoll can expose a Pyserini HTTP endpoint as the Pine-compatible `pi-search`
+RAGDoll can expose a search API endpoint as the Pine-compatible `pi-search`
 `http-json` backend contract:
 
 ```bash
-uv run ragdoll serve pyserini-wrapper \
-  --pyserini-base-url http://api.castorini.uwaterloo.ca \
-  --pyserini-index msmarco-v2.1-doc-segmented \
+uv run ragdoll serve castorini-wrapper \
+  --api-base-url http://api.castorini.uwaterloo.ca \
+  --index msmarco-v2.1-doc-segmented \
   --port 8092 \
   --search-word-limit 512 \
   --read-word-limit 4096 \
@@ -496,11 +496,11 @@ uv run ragdoll serve pyserini-wrapper \
 
 The wrapper serves:
 
-- `POST /search`: search requests mapped to Pyserini `/v1/<index>/search`.
-- `POST /read_document`: document reads mapped to Pyserini `/v1/<index>/doc/<docid>`.
+- `POST /search`: search requests mapped to the upstream `/v1/<index>/search`.
+- `POST /read_document`: document reads mapped to the upstream `/v1/<index>/doc/<docid>`.
 - `GET /pi_search_config`: the `PI_SEARCH_EXTENSION_CONFIG` JSON for the Pi search extension.
 
-Protected Pyserini services read bearer tokens from `PYSERINI_API_TOKEN` by
+Protected search APIs read bearer tokens from `CASTORINI_API_TOKEN` by
 default; override that with `--token-env`. The token is never passed as a flag:
 set it in your shell or in a local `.env` file. Values already present in the
 shell environment take precedence over `.env`.

@@ -1,4 +1,4 @@
-"""Pyserini HTTP wrapper compatible with Pine's pi-search backend contract."""
+"""Castorini HTTP wrapper (fronts a search API) for Pine's pi-search backend contract."""
 
 from __future__ import annotations
 
@@ -9,26 +9,26 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
-from ragdoll.config import PyseriniServeConfig, PyseriniWrapperConfig
+from ragdoll.config import CastoriniServeConfig, CastoriniWrapperConfig
 
 __all__ = [
-    "PyseriniServeConfig",
-    "PyseriniWrapperConfig",
+    "CastoriniServeConfig",
+    "CastoriniWrapperConfig",
     "build_pi_search_http_json_config",
-    "make_pyserini_wrapper_handler",
-    "read_pyserini_document",
-    "search_pyserini",
-    "serve_pyserini_wrapper",
+    "make_castorini_wrapper_handler",
+    "read_backend_document",
+    "search_backend",
+    "serve_castorini_wrapper",
 ]
 
 
 def build_pi_search_http_json_config(
     *,
     wrapper_base_url: str,
-    backend_id: str = "pyserini-http",
+    backend_id: str = "castorini-http",
     max_page_size: int = 100,
     max_read_limit: int = 200,
 ) -> dict[str, Any]:
@@ -80,7 +80,7 @@ def _clip_positive_int(value: Any, *, default: int, minimum: int = 1, maximum: i
     return max(minimum, min(maximum, parsed))
 
 
-def _pyserini_headers(config: PyseriniWrapperConfig) -> dict[str, str]:
+def _auth_headers(config: CastoriniWrapperConfig) -> dict[str, str]:
     token = os.environ.get(config.token_env, "").strip()
     if not token:
         return {}
@@ -102,13 +102,13 @@ def _fetch_json(url: str, *, headers: dict[str, str]) -> dict[str, Any]:
     return value
 
 
-def _pyserini_search_url(config: PyseriniWrapperConfig, *, query: str, limit: int) -> str:
+def _backend_search_url(config: CastoriniWrapperConfig, *, query: str, limit: int) -> str:
     params = urlencode({"query": query, "hits": str(limit)})
-    return f"{config.pyserini_base_url.rstrip('/')}/v1/{config.pyserini_index}/search?{params}"
+    return f"{config.api_base_url.rstrip('/')}/v1/{config.index}/search?{params}"
 
 
-def _pyserini_doc_url(config: PyseriniWrapperConfig, *, docid: str) -> str:
-    return f"{config.pyserini_base_url.rstrip('/')}/v1/{config.pyserini_index}/doc/{docid}"
+def _backend_doc_url(config: CastoriniWrapperConfig, *, docid: str) -> str:
+    return f"{config.api_base_url.rstrip('/')}/v1/{config.index}/doc/{quote(docid, safe='')}"
 
 
 def _truncate_words(text: str, limit: int) -> tuple[str, bool]:
@@ -155,7 +155,7 @@ def _hit_from_candidate(candidate: dict[str, Any], *, word_limit: int) -> dict[s
     return hit
 
 
-def search_pyserini(config: PyseriniWrapperConfig, request_body: dict[str, Any]) -> dict[str, Any]:
+def search_backend(config: CastoriniWrapperConfig, request_body: dict[str, Any]) -> dict[str, Any]:
     query = str(request_body.get("query", "")).strip()
     if not query:
         raise ValueError("query must be a non-empty string")
@@ -168,8 +168,8 @@ def search_pyserini(config: PyseriniWrapperConfig, request_body: dict[str, Any])
     upstream_limit = offset + limit - 1
     started = time.perf_counter()
     payload = _fetch_json(
-        _pyserini_search_url(config, query=query, limit=upstream_limit),
-        headers=_pyserini_headers(config),
+        _backend_search_url(config, query=query, limit=upstream_limit),
+        headers=_auth_headers(config),
     )
     candidates = [item for item in list(payload.get("candidates", [])) if isinstance(item, dict)]
     page = candidates[offset - 1 : offset - 1 + limit]
@@ -189,7 +189,7 @@ def search_pyserini(config: PyseriniWrapperConfig, request_body: dict[str, Any])
     return response
 
 
-def read_pyserini_document(config: PyseriniWrapperConfig, request_body: dict[str, Any]) -> dict[str, Any]:
+def read_backend_document(config: CastoriniWrapperConfig, request_body: dict[str, Any]) -> dict[str, Any]:
     docid = str(request_body.get("docid", "")).strip()
     if not docid:
         raise ValueError("docid must be a non-empty string")
@@ -200,7 +200,7 @@ def read_pyserini_document(config: PyseriniWrapperConfig, request_body: dict[str
         maximum=config.read_limit,
     )
     started = time.perf_counter()
-    payload = _fetch_json(_pyserini_doc_url(config, docid=docid), headers=_pyserini_headers(config))
+    payload = _fetch_json(_backend_doc_url(config, docid=docid), headers=_auth_headers(config))
     text = payload.get("doc")
     if text is None:
         return {
@@ -233,7 +233,7 @@ def read_pyserini_document(config: PyseriniWrapperConfig, request_body: dict[str
     return response
 
 
-def make_pyserini_wrapper_handler(config: PyseriniWrapperConfig) -> type[BaseHTTPRequestHandler]:
+def make_castorini_wrapper_handler(config: CastoriniWrapperConfig) -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:
             if self.path == "/health":
@@ -258,10 +258,10 @@ def make_pyserini_wrapper_handler(config: PyseriniWrapperConfig) -> type[BaseHTT
             try:
                 body = _read_json_body(self)
                 if self.path == "/search":
-                    _json_response(self, HTTPStatus.OK, search_pyserini(config, body))
+                    _json_response(self, HTTPStatus.OK, search_backend(config, body))
                     return
                 if self.path == "/read_document":
-                    _json_response(self, HTTPStatus.OK, read_pyserini_document(config, body))
+                    _json_response(self, HTTPStatus.OK, read_backend_document(config, body))
                     return
                 _json_response(self, HTTPStatus.NOT_FOUND, {"error": "not found"})
             except ValueError as exc:
@@ -275,7 +275,7 @@ def make_pyserini_wrapper_handler(config: PyseriniWrapperConfig) -> type[BaseHTT
     return Handler
 
 
-def serve_pyserini_wrapper(serve_config: PyseriniServeConfig) -> None:
+def serve_castorini_wrapper(serve_config: CastoriniServeConfig) -> None:
     config = serve_config.wrapper_config()
     wrapper_base_url = f"http://{serve_config.host}:{serve_config.port}"
     pi_search_config = build_pi_search_http_json_config(
@@ -286,12 +286,12 @@ def serve_pyserini_wrapper(serve_config: PyseriniServeConfig) -> None:
     )
     if serve_config.print_config:
         print("PI_SEARCH_EXTENSION_CONFIG=" + json.dumps(pi_search_config, separators=(",", ":")))
-    server = ThreadingHTTPServer((serve_config.host, serve_config.port), make_pyserini_wrapper_handler(config))
-    print(f"serving pyserini wrapper at {wrapper_base_url}")
-    print(f"upstream={config.pyserini_base_url.rstrip('/')}/v1/{config.pyserini_index}")
+    server = ThreadingHTTPServer((serve_config.host, serve_config.port), make_castorini_wrapper_handler(config))
+    print(f"serving castorini wrapper at {wrapper_base_url}")
+    print(f"upstream={config.api_base_url.rstrip('/')}/v1/{config.index}")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        print("stopping pyserini wrapper")
+        print("stopping castorini wrapper")
     finally:
         server.server_close()

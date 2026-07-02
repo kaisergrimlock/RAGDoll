@@ -106,7 +106,7 @@ def test_support_resolve_references_cli(tmp_path: Path, monkeypatch) -> None:
 
     monkeypatch.setattr(
         resolve_mod,
-        "read_pyserini_document",
+        "read_backend_document",
         lambda config, request_body: {"found": True, "docid": request_body["docid"], "text": "Resolved passage."},
     )
     monkeypatch.setattr(
@@ -120,9 +120,9 @@ def test_support_resolve_references_cli(tmp_path: Path, monkeypatch) -> None:
             str(input_path),
             "--output-file",
             str(output_path),
-            "--pyserini-api",
-            "http://pyserini",
-            "--pyserini-index",
+            "--api-base-url",
+            "http://api",
+            "--index",
             "climbmix",
         ],
     )
@@ -165,7 +165,7 @@ def test_support_resolve_references_prebuilt_cli(tmp_path: Path, monkeypatch) ->
             str(input_path),
             "--output-file",
             str(output_path),
-            "--pyserini-index",
+            "--index",
             "prebuilt-name",
         ],
     )

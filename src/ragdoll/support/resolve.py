@@ -4,36 +4,36 @@ import json
 from pathlib import Path
 from typing import Any, Protocol
 
-from ragdoll.config import PyseriniWrapperConfig, SupportResolveReferencesConfig
+from ragdoll.castorini_wrapper import read_backend_document
+from ragdoll.config import CastoriniWrapperConfig, SupportResolveReferencesConfig
 from ragdoll.jsonl import read_jsonl, write_jsonl
-from ragdoll.pyserini_wrapper import read_pyserini_document
 
 
 class ReferenceResolver(Protocol):
     def read(self, docid: str) -> str: ...
 
 
-class PyseriniApiResolver:
+class ApiReferenceResolver:
     def __init__(self, config: SupportResolveReferencesConfig) -> None:
-        self.config = PyseriniWrapperConfig(
-            pyserini_base_url=str(config.pyserini_api),
-            pyserini_index=str(config.pyserini_index),
+        self.config = CastoriniWrapperConfig(
+            api_base_url=str(config.api_base_url),
+            index=str(config.index),
             read_limit=config.read_limit,
             read_word_limit=config.read_word_limit,
             token_env=config.token_env,
         )
 
     def read(self, docid: str) -> str:
-        payload = read_pyserini_document(self.config, {"docid": docid, "limit": self.config.read_limit})
+        payload = read_backend_document(self.config, {"docid": docid, "limit": self.config.read_limit})
         if not payload.get("found"):
-            raise ValueError(f"reference docid not found in Pyserini HTTP index: {docid}")
+            raise ValueError(f"reference docid not found via the search API: {docid}")
         text = payload.get("text")
         if not isinstance(text, str) or not text.strip():
             raise ValueError(f"reference docid resolved to empty text: {docid}")
         return text
 
 
-class PyseriniIndexResolver:
+class LocalIndexResolver:
     def __init__(self, index: str, *, read_limit: int, read_word_limit: int) -> None:
         self.searcher = _lucene_searcher(index)
         self.read_limit = read_limit
@@ -56,14 +56,14 @@ class PyseriniIndexResolver:
 
 def resolve_references(config: SupportResolveReferencesConfig) -> None:
     resolver: ReferenceResolver
-    if config.pyserini_api is None:
-        resolver = PyseriniIndexResolver(
-            str(config.pyserini_index),
+    if config.api_base_url is None:
+        resolver = LocalIndexResolver(
+            str(config.index),
             read_limit=config.read_limit,
             read_word_limit=config.read_word_limit,
         )
     else:
-        resolver = PyseriniApiResolver(config)
+        resolver = ApiReferenceResolver(config)
 
     cache: dict[str, str] = {}
     rows = [

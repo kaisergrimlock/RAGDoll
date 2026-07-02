@@ -9,11 +9,11 @@ from ragdoll.cli import main
 from ragdoll.config import (
     DEFAULT_MAX_TRIALS,
     DEFAULT_WINDOW_SIZE,
+    CastoriniServeConfig,
+    CastoriniWrapperConfig,
     LocalAgentConfig,
     NuggetAssignConfig,
     NuggetCreateConfig,
-    PyseriniServeConfig,
-    PyseriniWrapperConfig,
     RunConfig,
     UmbrelaJudgeConfig,
     default_cache_dir,
@@ -120,12 +120,12 @@ def test_assign_validate_requires_exactly_one_input() -> None:
     NuggetAssignConfig(output_file=Path("out.jsonl"), input_json="{}").validate()
 
 
-def test_pyserini_serve_config_builds_wrapper_config() -> None:
-    serve = PyseriniServeConfig(pyserini_base_url="http://up", pyserini_index="idx", max_page_size=50)
+def test_castorini_serve_config_builds_wrapper_config() -> None:
+    serve = CastoriniServeConfig(api_base_url="http://up", index="idx", max_page_size=50)
     wrapper = serve.wrapper_config()
-    assert isinstance(wrapper, PyseriniWrapperConfig)
-    assert wrapper.pyserini_base_url == "http://up"
-    assert wrapper.pyserini_index == "idx"
+    assert isinstance(wrapper, CastoriniWrapperConfig)
+    assert wrapper.api_base_url == "http://up"
+    assert wrapper.index == "idx"
     assert wrapper.max_page_size == 50
 
 
@@ -185,19 +185,19 @@ def test_cli_missing_required_config_exits(tmp_path: Path, monkeypatch) -> None:
 
 
 def test_load_env_file_sets_missing_var(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.delenv("PYSERINI_API_TOKEN", raising=False)
+    monkeypatch.delenv("CASTORINI_API_TOKEN", raising=False)
     env_path = tmp_path / ".env"
-    env_path.write_text('# token\nPYSERINI_API_TOKEN="secret"\n', encoding="utf-8")
+    env_path.write_text('# token\nCASTORINI_API_TOKEN="secret"\n', encoding="utf-8")
     load_env_file(env_path)
-    assert os.environ["PYSERINI_API_TOKEN"] == "secret"
+    assert os.environ["CASTORINI_API_TOKEN"] == "secret"
 
 
 def test_load_env_file_does_not_override_shell_env(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.setenv("PYSERINI_API_TOKEN", "from-shell")
+    monkeypatch.setenv("CASTORINI_API_TOKEN", "from-shell")
     env_path = tmp_path / ".env"
-    env_path.write_text("PYSERINI_API_TOKEN=from-file\n", encoding="utf-8")
+    env_path.write_text("CASTORINI_API_TOKEN=from-file\n", encoding="utf-8")
     load_env_file(env_path)
-    assert os.environ["PYSERINI_API_TOKEN"] == "from-shell"
+    assert os.environ["CASTORINI_API_TOKEN"] == "from-shell"
 
 
 def test_load_env_file_missing_is_noop(tmp_path: Path) -> None:

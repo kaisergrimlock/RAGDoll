@@ -77,18 +77,18 @@ class LocalAgentConfig:
 
 
 @dataclass(frozen=True)
-class PyseriniWrapperConfig:
-    """Settings for the Pyserini HTTP wrapper request handlers."""
+class CastoriniWrapperConfig:
+    """Settings for the Castorini HTTP wrapper request handlers."""
 
-    pyserini_base_url: str
-    pyserini_index: str
-    backend_id: str = "pyserini-http"
+    api_base_url: str
+    index: str
+    backend_id: str = "castorini-http"
     default_limit: int = 10
     max_page_size: int = 100
     read_limit: int = 200
     search_word_limit: int = 512
     read_word_limit: int = 4096
-    token_env: str = "PYSERINI_API_TOKEN"
+    token_env: str = "CASTORINI_API_TOKEN"
 
 
 def _unwrap_optional(hint: Any) -> Any:
@@ -328,16 +328,16 @@ class SupportJudgeConfig(RunConfig):
 class SupportResolveReferencesConfig(FileIOConfig):
     """`support resolve-references`: attach cited passage text to RAG answers."""
 
-    pyserini_api: str | None = None
-    pyserini_index: str | None = None
+    api_base_url: str | None = None
+    index: str | None = None
     read_limit: int = 200
     read_word_limit: int = 4096
-    token_env: str = "PYSERINI_API_TOKEN"
+    token_env: str = "CASTORINI_API_TOKEN"
 
     def validate(self) -> None:
         super().validate()
-        if self.pyserini_index is None:
-            raise SystemExit("support resolve-references requires --pyserini-index")
+        if self.index is None:
+            raise SystemExit("support resolve-references requires --index")
 
 
 @dataclass
@@ -602,27 +602,27 @@ class VisualizeAlignmentConfig(BaseConfig):
 
 
 @dataclass
-class PyseriniServeConfig(BaseConfig):
-    pyserini_base_url: str | None = None
-    pyserini_index: str | None = None
+class CastoriniServeConfig(BaseConfig):
+    api_base_url: str | None = None
+    index: str | None = None
     host: str = "127.0.0.1"
     port: int = 8091
-    backend_id: str = "pyserini-http"
+    backend_id: str = "castorini-http"
     default_limit: int = 10
     max_page_size: int = 100
     read_limit: int = 200
     search_word_limit: int = 512
     read_word_limit: int = 4096
-    token_env: str = "PYSERINI_API_TOKEN"
+    token_env: str = "CASTORINI_API_TOKEN"
     print_config: bool = False
 
-    _required: ClassVar[tuple[str, ...]] = ("pyserini_base_url", "pyserini_index")
+    _required: ClassVar[tuple[str, ...]] = ("api_base_url", "index")
 
-    def wrapper_config(self) -> PyseriniWrapperConfig:
-        """Project serve settings onto a ``PyseriniWrapperConfig``."""
-        return PyseriniWrapperConfig(
-            pyserini_base_url=self.pyserini_base_url,
-            pyserini_index=self.pyserini_index,
+    def wrapper_config(self) -> CastoriniWrapperConfig:
+        """Project serve settings onto a ``CastoriniWrapperConfig``."""
+        return CastoriniWrapperConfig(
+            api_base_url=self.api_base_url,
+            index=self.index,
             backend_id=self.backend_id,
             default_limit=self.default_limit,
             max_page_size=self.max_page_size,
