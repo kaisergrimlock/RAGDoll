@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from pi_trec.cli import main
-from pi_trec.config import (
+from ragdoll.cli import main
+from ragdoll.config import (
     DEFAULT_MAX_TRIALS,
     DEFAULT_WINDOW_SIZE,
     LocalAgentConfig,
@@ -49,7 +49,7 @@ def test_defaults_match_legacy_values() -> None:
 def test_no_cache_overrides_default_and_configured_dir(tmp_path: Path) -> None:
     import argparse
 
-    from pi_trec.cli import build_config
+    from ragdoll.cli import build_config
 
     base = dict(config_cls=RunConfig, input_file="in.jsonl", output_file="out.jsonl")
     assert build_config(argparse.Namespace(**base)).cache_dir == default_cache_dir()
@@ -151,7 +151,7 @@ def test_cli_runs_from_yaml_config_alone(tmp_path: Path, monkeypatch) -> None:
         f"input_file: {input_path}\noutput_file: {output_path}\nprompt_type: basic\n",
         encoding="utf-8",
     )
-    monkeypatch.setattr(sys, "argv", ["pi-trec", "materialize", "umbrela", "--config", str(config_path)])
+    monkeypatch.setattr(sys, "argv", ["ragdoll", "materialize", "umbrela", "--config", str(config_path)])
     main()
     row = json.loads(output_path.read_text(encoding="utf-8"))
     assert row["evaluator"] == "umbrela"
@@ -171,7 +171,7 @@ def test_cli_flag_overrides_yaml_config(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(
         sys,
         "argv",
-        ["pi-trec", "materialize", "umbrela", "--config", str(config_path), "--prompt-type", "bing"],
+        ["ragdoll", "materialize", "umbrela", "--config", str(config_path), "--prompt-type", "bing"],
     )
     main()
     row = json.loads(output_path.read_text(encoding="utf-8"))
@@ -179,7 +179,7 @@ def test_cli_flag_overrides_yaml_config(tmp_path: Path, monkeypatch) -> None:
 
 
 def test_cli_missing_required_config_exits(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.setattr(sys, "argv", ["pi-trec", "materialize", "umbrela", "--output-file", str(tmp_path / "o.jsonl")])
+    monkeypatch.setattr(sys, "argv", ["ragdoll", "materialize", "umbrela", "--output-file", str(tmp_path / "o.jsonl")])
     with pytest.raises(SystemExit, match="--input-file"):
         main()
 

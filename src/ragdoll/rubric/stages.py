@@ -7,10 +7,10 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
-from pi_trec.config import LocalAgentConfig, RubricGradeConfig
-from pi_trec.jsonl import read_jsonl
-from pi_trec.nuggetizer.metrics import qid_of
-from pi_trec.nuggetizer.stages import (
+from ragdoll.config import LocalAgentConfig, RubricGradeConfig
+from ragdoll.jsonl import read_jsonl
+from ragdoll.nuggetizer.metrics import qid_of
+from ragdoll.nuggetizer.stages import (
     _BACKOFF_BASE_SECONDS,
     _BACKOFF_MAX_SECONDS,
     _generate_labels,
@@ -18,7 +18,7 @@ from pi_trec.nuggetizer.stages import (
     normalize_nuggets,
     normalize_query,
 )
-from pi_trec.rubric.prompts import (
+from ragdoll.rubric.prompts import (
     RUBRIC_AUTHOR_SYSTEM,
     RUBRIC_GRADER_SYSTEM,
     finalize_rubric,
@@ -27,8 +27,8 @@ from pi_trec.rubric.prompts import (
     render_author_prompt,
     render_grade_prompt,
 )
-from pi_trec.runner import run_prompt
-from pi_trec.trec_io import load_nuggets_by_qid
+from ragdoll.runner import run_prompt
+from ragdoll.trec_io import load_nuggets_by_qid
 
 
 def _topic_identity(record: dict[str, Any]) -> tuple[str, str]:

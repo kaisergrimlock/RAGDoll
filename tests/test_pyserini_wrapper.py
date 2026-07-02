@@ -1,4 +1,4 @@
-from pi_trec.pyserini_wrapper import (
+from ragdoll.pyserini_wrapper import (
     PyseriniWrapperConfig,
     build_pi_search_http_json_config,
     read_pyserini_document,
@@ -35,7 +35,7 @@ def test_search_pyserini_maps_candidates(monkeypatch) -> None:
             ]
         }
 
-    monkeypatch.setattr("pi_trec.pyserini_wrapper._fetch_json", fake_fetch_json)
+    monkeypatch.setattr("ragdoll.pyserini_wrapper._fetch_json", fake_fetch_json)
     monkeypatch.setenv("PYSERINI_API_TOKEN", "secret")
 
     response = search_pyserini(
@@ -59,7 +59,7 @@ def test_search_pyserini_truncates_snippets_by_word_limit(monkeypatch) -> None:
     def fake_fetch_json(url: str, *, headers: dict[str, str]):
         return {"candidates": [{"docid": "d1", "doc": {"contents": "one two three four"}, "score": 2.5}]}
 
-    monkeypatch.setattr("pi_trec.pyserini_wrapper._fetch_json", fake_fetch_json)
+    monkeypatch.setattr("ragdoll.pyserini_wrapper._fetch_json", fake_fetch_json)
 
     response = search_pyserini(
         PyseriniWrapperConfig("http://upstream", "idx", search_word_limit=3),
@@ -76,7 +76,7 @@ def test_read_pyserini_document_paginates_lines(monkeypatch) -> None:
         assert url == "http://upstream/v1/idx/doc/d1"
         return {"docid": "d1", "doc": {"contents": "one\ntwo\nthree"}, "score": 4.0}
 
-    monkeypatch.setattr("pi_trec.pyserini_wrapper._fetch_json", fake_fetch_json)
+    monkeypatch.setattr("ragdoll.pyserini_wrapper._fetch_json", fake_fetch_json)
 
     response = read_pyserini_document(
         PyseriniWrapperConfig("http://upstream", "idx", read_limit=2),
@@ -95,7 +95,7 @@ def test_read_pyserini_document_truncates_text_by_word_limit(monkeypatch) -> Non
     def fake_fetch_json(url: str, *, headers: dict[str, str]):
         return {"docid": "d1", "doc": {"body": "one two three\nfour five six"}}
 
-    monkeypatch.setattr("pi_trec.pyserini_wrapper._fetch_json", fake_fetch_json)
+    monkeypatch.setattr("ragdoll.pyserini_wrapper._fetch_json", fake_fetch_json)
 
     response = read_pyserini_document(
         PyseriniWrapperConfig("http://upstream", "idx", read_limit=10, read_word_limit=4),

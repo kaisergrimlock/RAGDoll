@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from pi_trec.config import LocalAgentConfig
-from pi_trec.runner import (
+from ragdoll.config import LocalAgentConfig
+from ragdoll.runner import (
     CACHE_TTL_SECONDS,
     build_agent_args,
     cache_key,

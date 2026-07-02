@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from pi_trec.arena import (
+from ragdoll.arena import (
     battles_for_system_degree,
     fit_arena_ratings,
     iter_arena_tasks,
@@ -17,8 +17,8 @@ from pi_trec.arena import (
     sampled_pair_qids,
     sampled_topic_pairs,
 )
-from pi_trec.arena.stages import assistant_order, coverage_rows
-from pi_trec.cli import main
+from ragdoll.arena.stages import assistant_order, coverage_rows
+from ragdoll.cli import main
 
 
 def _write(path: Path, rows: list[dict]) -> Path:
@@ -274,7 +274,7 @@ def test_materialize_arena_cli(tmp_path: Path, monkeypatch) -> None:
         sys,
         "argv",
         [
-            "pi-trec",
+            "ragdoll",
             "materialize",
             "arena",
             "--answers",
@@ -303,7 +303,7 @@ def test_materialize_arena_cli_accepts_answers_dir(tmp_path: Path, monkeypatch) 
         sys,
         "argv",
         [
-            "pi-trec",
+            "ragdoll",
             "materialize",
             "arena",
             "--answers-dir",
@@ -341,7 +341,7 @@ def test_materialize_arena_cli_samples_topics_per_pair(tmp_path: Path, monkeypat
         sys,
         "argv",
         [
-            "pi-trec",
+            "ragdoll",
             "materialize",
             "arena",
             "--answers",
@@ -377,7 +377,7 @@ def test_materialize_arena_cli_samples_battles_per_system_per_topic(tmp_path: Pa
             )
         )
     output = tmp_path / "tasks.jsonl"
-    argv = ["pi-trec", "materialize", "arena", "--output-file", str(output)]
+    argv = ["ragdoll", "materialize", "arena", "--output-file", str(output)]
     for path in paths:
         argv.extend(["--answers", str(path)])
     argv.extend(["--sample-battles-per-system-per-topic", "1", "--sampling-seed", "5"])
@@ -418,7 +418,7 @@ print(json.dumps({"type":"message_end","message":{"role":"assistant","content":"
         sys,
         "argv",
         [
-            "pi-trec",
+            "ragdoll",
             "arena",
             "compare-all",
             "--answers",
@@ -474,7 +474,7 @@ print(json.dumps({"type":"message_end","message":{"role":"assistant","content":"
         sys,
         "argv",
         [
-            "pi-trec",
+            "ragdoll",
             "arena",
             "compare-all",
             "--answers-dir",

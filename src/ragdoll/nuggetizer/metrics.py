@@ -22,11 +22,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from pi_trec.config import NuggetMetricsConfig
-from pi_trec.jsonl import read_jsonl
-from pi_trec.stats import kendall_tau
+from ragdoll.config import NuggetMetricsConfig
+from ragdoll.jsonl import read_jsonl
+from ragdoll.stats import kendall_tau
 
-logger = logging.getLogger("pi_trec.nuggetizer.metrics")
+logger = logging.getLogger("ragdoll.nuggetizer.metrics")
 
 # Metric short name -> per-cell column produced by ``calculate_scores``.
 METRIC_COLUMNS = {

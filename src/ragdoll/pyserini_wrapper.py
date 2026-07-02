@@ -12,7 +12,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from pi_trec.config import PyseriniServeConfig, PyseriniWrapperConfig
+from ragdoll.config import PyseriniServeConfig, PyseriniWrapperConfig
 
 __all__ = [
     "PyseriniServeConfig",

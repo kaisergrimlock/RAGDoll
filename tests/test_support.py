@@ -2,7 +2,7 @@ import asyncio
 import json
 from pathlib import Path
 
-from pi_trec.config import (
+from ragdoll.config import (
     SupportAssembleConfig,
     SupportJudgeConfig,
     SupportMetricRowsConfig,
@@ -10,7 +10,7 @@ from pi_trec.config import (
     SupportResolveReferencesConfig,
     SupportSummarizeConfig,
 )
-from pi_trec.support import (
+from ragdoll.support import (
     assemble,
     assemble_support_assignments,
     compute_metrics,
@@ -24,7 +24,7 @@ from pi_trec.support import (
     support_metric,
     write_metric_rows,
 )
-from pi_trec.support import resolve as resolve_mod
+from ragdoll.support import resolve as resolve_mod
 
 
 def _fake_agent(tmp_path: Path, output_text: str) -> Path:

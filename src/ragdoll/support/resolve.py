@@ -4,9 +4,9 @@ import json
 from pathlib import Path
 from typing import Any, Protocol
 
-from pi_trec.config import PyseriniWrapperConfig, SupportResolveReferencesConfig
-from pi_trec.jsonl import read_jsonl, write_jsonl
-from pi_trec.pyserini_wrapper import read_pyserini_document
+from ragdoll.config import PyseriniWrapperConfig, SupportResolveReferencesConfig
+from ragdoll.jsonl import read_jsonl, write_jsonl
+from ragdoll.pyserini_wrapper import read_pyserini_document
 
 
 class ReferenceResolver(Protocol):

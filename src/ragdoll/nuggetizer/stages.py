@@ -6,7 +6,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
-from pi_trec.config import (
+from ragdoll.config import (
     LocalAgentConfig,
     MaterializeNuggetAgenticCreateConfig,
     MaterializeNuggetAssignConfig,
@@ -14,8 +14,8 @@ from pi_trec.config import (
     MaterializeNuggetScoreConfig,
     NuggetAssignConfig,
 )
-from pi_trec.jsonl import read_jsonl, write_jsonl
-from pi_trec.nuggetizer.prompts import (
+from ragdoll.jsonl import read_jsonl, write_jsonl
+from ragdoll.nuggetizer.prompts import (
     NUGGET_AGENTIC_CREATOR_SYSTEM,
     NUGGET_ASSIGNER_SYSTEM,
     NUGGET_CREATOR_SYSTEM,
@@ -26,7 +26,7 @@ from pi_trec.nuggetizer.prompts import (
     render_create_prompt,
     render_score_prompt,
 )
-from pi_trec.runner import run_prompt
+from ragdoll.runner import run_prompt
 
 # Exponential backoff between retries on a parse miss or provider error.
 _BACKOFF_BASE_SECONDS = 0.5

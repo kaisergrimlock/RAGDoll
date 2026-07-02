@@ -15,7 +15,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
-from pi_trec.config import (
+from ragdoll.config import (
     DEFAULT_MAX_CONCURRENCY,
     DEFAULT_MODEL,
     DEFAULT_PROVIDER,
@@ -25,7 +25,7 @@ from pi_trec.config import (
     LocalAgentConfig,
     RunConfig,
 )
-from pi_trec.jsonl import append_jsonl, completed_task_ids, read_jsonl
+from ragdoll.jsonl import append_jsonl, completed_task_ids, read_jsonl
 
 __all__ = [
     "CACHE_TTL_SECONDS",
@@ -191,7 +191,7 @@ def extract_usage(events: Iterable[dict[str, Any]]) -> dict[str, float]:
 
 
 def write_system_prompt_extension(directory: Path, system_prompt: str) -> Path:
-    extension_path = directory / "pi_trec_system_prompt_override.mjs"
+    extension_path = directory / "ragdoll_system_prompt_override.mjs"
     prompt_json = json.dumps(system_prompt, ensure_ascii=False)
     extension_path.write_text(
         "\n".join(
@@ -287,7 +287,7 @@ async def run_prompt(
             cached.pop("cached_at", None)
             return {**cached, "task_id": task_id, "metadata": metadata or {}, "cached": True}
 
-    with tempfile.TemporaryDirectory(prefix="pi-trec-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="ragdoll-") as tmp:
         tmp_path = Path(tmp)
         prompt_path = tmp_path / "prompt.txt"
         prompt_path.write_text(instruction, encoding="utf-8")

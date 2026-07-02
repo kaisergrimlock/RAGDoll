@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from pi_trec.config import MaterializeSupportConfig
-from pi_trec.jsonl import read_jsonl, write_jsonl
-from pi_trec.support.prompts import render_support_prompt
+from ragdoll.config import MaterializeSupportConfig
+from ragdoll.jsonl import read_jsonl, write_jsonl
+from ragdoll.support.prompts import render_support_prompt
 
 
 def iter_support_tasks(records: list[dict[str, Any]]) -> list[dict[str, Any]]:

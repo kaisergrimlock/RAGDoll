@@ -1,8 +1,8 @@
 import json
 from pathlib import Path
 
-from pi_trec.config import MaterializeAssignInputsConfig
-from pi_trec.trec_io import (
+from ragdoll.config import MaterializeAssignInputsConfig
+from ragdoll.trec_io import (
     iter_assign_payloads_from_files,
     load_nuggets_by_qid,
     materialize_assign_inputs,

@@ -3,11 +3,11 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from pi_trec.config import SupportJudgeConfig
-from pi_trec.jsonl import append_jsonl, completed_task_ids, read_jsonl
-from pi_trec.runner import run_prompt
-from pi_trec.support.prompts import parse_support_label
-from pi_trec.support.stages import iter_support_tasks
+from ragdoll.config import SupportJudgeConfig
+from ragdoll.jsonl import append_jsonl, completed_task_ids, read_jsonl
+from ragdoll.runner import run_prompt
+from ragdoll.support.prompts import parse_support_label
+from ragdoll.support.stages import iter_support_tasks
 
 
 async def judge(config: SupportJudgeConfig) -> None:

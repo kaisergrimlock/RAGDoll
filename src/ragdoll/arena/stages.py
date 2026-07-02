@@ -8,8 +8,8 @@ from itertools import combinations
 from pathlib import Path
 from typing import Any
 
-from pi_trec.arena.prompts import render_arena_prompt
-from pi_trec.jsonl import read_jsonl
+from ragdoll.arena.prompts import render_arena_prompt
+from ragdoll.jsonl import read_jsonl
 
 
 @dataclass(frozen=True)

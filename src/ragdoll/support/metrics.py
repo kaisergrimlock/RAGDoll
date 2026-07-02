@@ -6,8 +6,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-from pi_trec.config import SupportMetricRowsConfig, SupportMetricsConfig
-from pi_trec.jsonl import read_jsonl, write_jsonl
+from ragdoll.config import SupportMetricRowsConfig, SupportMetricsConfig
+from ragdoll.jsonl import read_jsonl, write_jsonl
 
 WEIGHTED_SCORES = {-1: 0.0, 0: 0.0, 1: 0.5, 2: 1.0}
 HARD_SCORES = {-1: 0.0, 0: 0.0, 1: 0.0, 2: 1.0}

@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from pi_trec.nuggetizer.prompts import clean_response, parse_label_list
+from ragdoll.nuggetizer.prompts import clean_response, parse_label_list
 
 CRITERION_TYPES = ("explicit", "implicit", "synthesis", "references", "communication", "instruction")
 TIERS = ("mandatory", "optional")

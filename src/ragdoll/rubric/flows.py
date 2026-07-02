@@ -4,17 +4,17 @@ import asyncio
 from pathlib import Path
 from typing import Any
 
-from pi_trec.config import (
+from ragdoll.config import (
     NuggetCreateConfig,
     RubricAuthorConfig,
     RubricEvalConfig,
     RubricGradeConfig,
     RubricScoreConfig,
 )
-from pi_trec.jsonl import append_jsonl, read_jsonl, write_jsonl
-from pi_trec.nuggetizer.flows import _select_tasks, _shared, create
-from pi_trec.rubric.metrics import compute_scores
-from pi_trec.rubric.stages import (
+from ragdoll.jsonl import append_jsonl, read_jsonl, write_jsonl
+from ragdoll.nuggetizer.flows import _select_tasks, _shared, create
+from ragdoll.rubric.metrics import compute_scores
+from ragdoll.rubric.stages import (
     _generate_rubric,
     _grade_windowed,
     _load_grade_payloads,

@@ -3,8 +3,8 @@ import json
 import math
 from pathlib import Path
 
-from pi_trec.config import NuggetMetricsConfig
-from pi_trec.nuggetizer.metrics import (
+from ragdoll.config import NuggetMetricsConfig
+from ragdoll.nuggetizer.metrics import (
     calculate_scores,
     cell_metric,
     compute_metrics,
@@ -12,7 +12,7 @@ from pi_trec.nuggetizer.metrics import (
     normalize_assignment,
     run_means,
 )
-from pi_trec.stats import kendall_tau
+from ragdoll.stats import kendall_tau
 
 
 def test_calculate_scores_matches_reference_semantics() -> None:

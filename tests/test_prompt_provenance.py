@@ -18,7 +18,7 @@ from string import Formatter
 import pytest
 import yaml
 
-from pi_trec.nuggetizer import (
+from ragdoll.nuggetizer import (
     NUGGET_ASSIGNER_2GRADE_USER,
     NUGGET_ASSIGNER_SYSTEM,
     NUGGET_ASSIGNER_USER,
@@ -34,8 +34,8 @@ from pi_trec.nuggetizer import (
     render_create_prompt,
     render_score_prompt,
 )
-from pi_trec.support import SUPPORT_EVAL_PROMPT, render_support_prompt
-from pi_trec.umbrela import (
+from ragdoll.support import SUPPORT_EVAL_PROMPT, render_support_prompt
+from ragdoll.umbrela import (
     UMBRELA_ZERO_BASIC,
     UMBRELA_ZERO_BING,
     iter_prompt_tasks,

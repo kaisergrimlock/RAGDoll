@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from pi_trec.config import MaterializeUmbrelaConfig
-from pi_trec.jsonl import read_jsonl, write_jsonl
-from pi_trec.umbrela.prompts import render_umbrela_prompt
+from ragdoll.config import MaterializeUmbrelaConfig
+from ragdoll.jsonl import read_jsonl, write_jsonl
+from ragdoll.umbrela.prompts import render_umbrela_prompt
 
 
 def query_text(record: dict[str, Any]) -> tuple[str, str | None]:

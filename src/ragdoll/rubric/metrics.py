@@ -6,13 +6,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from pi_trec.config import RubricScoreConfig
-from pi_trec.jsonl import read_jsonl
-from pi_trec.nuggetizer.metrics import _fmt, mean, qid_of, response_length, run_id_of, write_csv
-from pi_trec.rubric.prompts import CRITERION_TYPES
-from pi_trec.stats import kendall_tau
+from ragdoll.config import RubricScoreConfig
+from ragdoll.jsonl import read_jsonl
+from ragdoll.nuggetizer.metrics import _fmt, mean, qid_of, response_length, run_id_of, write_csv
+from ragdoll.rubric.prompts import CRITERION_TYPES
+from ragdoll.stats import kendall_tau
 
-logger = logging.getLogger("pi_trec.rubric.metrics")
+logger = logging.getLogger("ragdoll.rubric.metrics")
 
 VERDICT_VALUES = {"satisfied": 1.0, "partially_satisfied": 0.5, "not_satisfied": 0.0}
 

@@ -5,12 +5,12 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
-from pi_trec.arena.metrics import leaderboard_rows, pairwise_rows, write_csv
-from pi_trec.arena.prompts import parse_verdict
-from pi_trec.arena.stages import coverage_rows, iter_arena_tasks, load_answer_sets
-from pi_trec.config import ArenaCompareAllConfig, MaterializeArenaConfig
-from pi_trec.jsonl import append_jsonl, read_jsonl, write_jsonl
-from pi_trec.runner import run_prompt, select_rows
+from ragdoll.arena.metrics import leaderboard_rows, pairwise_rows, write_csv
+from ragdoll.arena.prompts import parse_verdict
+from ragdoll.arena.stages import coverage_rows, iter_arena_tasks, load_answer_sets
+from ragdoll.config import ArenaCompareAllConfig, MaterializeArenaConfig
+from ragdoll.jsonl import append_jsonl, read_jsonl, write_jsonl
+from ragdoll.runner import run_prompt, select_rows
 
 
 def _answer_paths(*, answers: list[Path], answers_dir: Path | None) -> list[Path]:

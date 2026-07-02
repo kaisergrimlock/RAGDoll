@@ -4,10 +4,10 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
-from pi_trec.config import SupportAssembleConfig, SupportSummarizeConfig
-from pi_trec.jsonl import read_jsonl, write_jsonl
-from pi_trec.support.metrics import metric_lines, support_metric_rows
-from pi_trec.support.prompts import parse_support_label
+from ragdoll.config import SupportAssembleConfig, SupportSummarizeConfig
+from ragdoll.jsonl import read_jsonl, write_jsonl
+from ragdoll.support.metrics import metric_lines, support_metric_rows
+from ragdoll.support.prompts import parse_support_label
 
 SUPPORT_LABEL_SCORES = {"FS": 2, "PS": 1, "NS": 0}
 

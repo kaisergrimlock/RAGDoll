@@ -5,7 +5,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
-from pi_trec.config import (
+from ragdoll.config import (
     LocalAgentConfig,
     NuggetAgenticCreateConfig,
     NuggetAssignConfig,
@@ -13,10 +13,10 @@ from pi_trec.config import (
     NuggetEvalConfig,
     NuggetMetricsConfig,
 )
-from pi_trec.jsonl import append_jsonl, completed_task_ids, read_jsonl, write_jsonl
-from pi_trec.nuggetizer.metrics import compute_metrics
-from pi_trec.nuggetizer.prompts import parse_label_list
-from pi_trec.nuggetizer.stages import (
+from ragdoll.jsonl import append_jsonl, completed_task_ids, read_jsonl, write_jsonl
+from ragdoll.nuggetizer.metrics import compute_metrics
+from ragdoll.nuggetizer.prompts import parse_label_list
+from ragdoll.nuggetizer.stages import (
     _assign_windowed,
     _create_windowed,
     _load_assign_payloads,
@@ -24,8 +24,8 @@ from pi_trec.nuggetizer.stages import (
     iter_agentic_create_tasks,
     iter_create_inputs,
 )
-from pi_trec.runner import run_prompt, select_rows
-from pi_trec.trec_io import iter_assign_payloads_from_files
+from ragdoll.runner import run_prompt, select_rows
+from ragdoll.trec_io import iter_assign_payloads_from_files
 
 
 def _select_tasks(items: list[dict[str, Any]], *, config: Any, output: Path) -> list[dict[str, Any]]:

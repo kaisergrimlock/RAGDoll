@@ -3,11 +3,11 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from pi_trec.config import UmbrelaJudgeConfig
-from pi_trec.jsonl import append_jsonl, completed_task_ids, read_jsonl
-from pi_trec.runner import run_prompt
-from pi_trec.umbrela.prompts import parse_umbrela_judgment
-from pi_trec.umbrela.stages import iter_prompt_tasks
+from ragdoll.config import UmbrelaJudgeConfig
+from ragdoll.jsonl import append_jsonl, completed_task_ids, read_jsonl
+from ragdoll.runner import run_prompt
+from ragdoll.umbrela.prompts import parse_umbrela_judgment
+from ragdoll.umbrela.stages import iter_prompt_tasks
 
 
 async def judge(config: UmbrelaJudgeConfig) -> None:

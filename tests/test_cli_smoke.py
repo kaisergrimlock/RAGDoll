@@ -2,8 +2,8 @@ import json
 import sys
 from pathlib import Path
 
-from pi_trec.cli import main
-from pi_trec.support import resolve as resolve_mod
+from ragdoll.cli import main
+from ragdoll.support import resolve as resolve_mod
 
 
 def test_materialize_umbrela_cli(tmp_path: Path, monkeypatch) -> None:
@@ -14,7 +14,7 @@ def test_materialize_umbrela_cli(tmp_path: Path, monkeypatch) -> None:
         sys,
         "argv",
         [
-            "pi-trec",
+            "ragdoll",
             "materialize",
             "umbrela",
             "--input-file",
@@ -46,7 +46,7 @@ print(json.dumps({"type":"message_end","message":{"role":"assistant","content":"
         sys,
         "argv",
         [
-            "pi-trec",
+            "ragdoll",
             "support",
             "judge",
             "--input-file",
@@ -77,7 +77,7 @@ def test_support_metrics_cli(tmp_path: Path, monkeypatch) -> None:
         sys,
         "argv",
         [
-            "pi-trec",
+            "ragdoll",
             "support",
             "metrics",
             "--input-file",
@@ -113,7 +113,7 @@ def test_support_resolve_references_cli(tmp_path: Path, monkeypatch) -> None:
         sys,
         "argv",
         [
-            "pi-trec",
+            "ragdoll",
             "support",
             "resolve-references",
             "--input-file",
@@ -158,7 +158,7 @@ def test_support_resolve_references_prebuilt_cli(tmp_path: Path, monkeypatch) ->
         sys,
         "argv",
         [
-            "pi-trec",
+            "ragdoll",
             "support",
             "resolve-references",
             "--input-file",
@@ -185,7 +185,7 @@ def test_support_metric_rows_cli(tmp_path: Path, monkeypatch) -> None:
         sys,
         "argv",
         [
-            "pi-trec",
+            "ragdoll",
             "support",
             "metric-rows",
             "--input-file",
@@ -216,7 +216,7 @@ def test_support_assemble_cli(tmp_path: Path, monkeypatch) -> None:
         sys,
         "argv",
         [
-            "pi-trec",
+            "ragdoll",
             "support",
             "assemble",
             "--answers-file",
@@ -270,7 +270,7 @@ print(json.dumps({"type":"message_end","message":{"role":"assistant","content":c
         sys,
         "argv",
         [
-            "pi-trec",
+            "ragdoll",
             "nuggetizer",
             "agentic-create",
             "--input-file",
@@ -323,7 +323,7 @@ print(json.dumps({"type":"message_end","message":{"role":"assistant","content":"
         sys,
         "argv",
         [
-            "pi-trec",
+            "ragdoll",
             "nuggetizer",
             "agentic-create",
             "--input-file",
