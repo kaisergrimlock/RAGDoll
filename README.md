@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/figures/ragdoll-header.svg" alt="RAGDoll: automated evaluation for RAG systems" width="100%">
+</p>
+
 # RAGDoll
 
 Pi-based runner for TREC RAG evaluation.
