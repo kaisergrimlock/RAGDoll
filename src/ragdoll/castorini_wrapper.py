@@ -1,4 +1,4 @@
-"""Castorini HTTP wrapper (fronts a search API) for Pine's pi-search backend contract."""
+"""Castorini HTTP wrapper (fronts a search API) for pi-search backend contract."""
 
 from __future__ import annotations
 
