@@ -3,8 +3,8 @@ import json
 import math
 from pathlib import Path
 
-from pi_trec.config import RubricAuthorConfig, RubricEvalConfig, RubricGradeConfig, RubricScoreConfig
-from pi_trec.rubric import (
+from ragdoll.config import RubricAuthorConfig, RubricEvalConfig, RubricGradeConfig, RubricScoreConfig
+from ragdoll.rubric import (
     author,
     cell_score,
     compute_scores,
@@ -143,7 +143,7 @@ def test_render_prompts_have_no_negative_text() -> None:
 
 
 def test_format_criteria_numbers_each_line() -> None:
-    from pi_trec.rubric.prompts import format_criteria
+    from ragdoll.rubric.prompts import format_criteria
 
     assert format_criteria([{"text": "first"}, {"text": "second"}]) == "1. first\n2. second"
 

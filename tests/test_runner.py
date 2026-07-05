@@ -2,7 +2,7 @@ import asyncio
 import json
 from pathlib import Path
 
-from pi_trec.runner import (
+from ragdoll.runner import (
     LocalAgentConfig,
     RunConfig,
     build_agent_args,
@@ -73,7 +73,7 @@ def test_build_agent_args_with_extension_matches_pine_surface() -> None:
 def test_write_system_prompt_extension_replaces_prompt(tmp_path: Path) -> None:
     extension_path = write_system_prompt_extension(tmp_path, "exact prompt")
 
-    assert extension_path.name == "pi_trec_system_prompt_override.mjs"
+    assert extension_path.name == "ragdoll_system_prompt_override.mjs"
     text = extension_path.read_text(encoding="utf-8")
     assert "before_agent_start" in text
     assert 'systemPrompt: "exact prompt"' in text

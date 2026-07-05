@@ -2,8 +2,8 @@ import asyncio
 import json
 from pathlib import Path
 
-from pi_trec.config import UmbrelaJudgeConfig
-from pi_trec.umbrela import iter_prompt_tasks, judge, parse_umbrela_judgment, render_umbrela_prompt
+from ragdoll.config import UmbrelaJudgeConfig
+from ragdoll.umbrela import iter_prompt_tasks, judge, parse_umbrela_judgment, render_umbrela_prompt
 
 
 def _fake_agent(tmp_path: Path, output_text: str) -> Path:

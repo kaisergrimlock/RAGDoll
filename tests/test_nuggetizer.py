@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from pi_trec.nuggetizer import (
+from ragdoll.nuggetizer import (
     NUGGET_AGENTIC_CREATOR_SYSTEM,
     NUGGET_ASSIGNER_SYSTEM,
     NUGGET_CREATOR_SYSTEM,

@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from pi_trec.config import CACHE_DIR_ENV
+from ragdoll.config import CACHE_DIR_ENV
 
 
 @pytest.fixture(autouse=True)

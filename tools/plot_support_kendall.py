@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from pi_trec.nuggetizer.metrics import kendall_tau
+from ragdoll.nuggetizer.metrics import kendall_tau
 
 METRICS = (
     ("weighted_precision", "weighted_precision_first_citation"),
@@ -143,7 +143,7 @@ def plot_support_kendall(
         ax.set_aspect("equal", adjustable="box")
         ax.grid(True, color="#cfcfcf", linewidth=0.8, alpha=0.45)
         ax.set_title(f"Metric: {display_metric}", fontsize=16)
-        ax.set_xlabel("RagDoll", fontsize=13)
+        ax.set_xlabel("RAGDoll", fontsize=13)
         ax.set_ylabel("NIST", fontsize=13)
         ax.text(
             0.03,
@@ -212,7 +212,7 @@ def plot_support_kendall(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Plot RagDoll-vs-NIST support Kendall tau comparisons.")
+    parser = argparse.ArgumentParser(description="Plot RAGDoll-vs-NIST support Kendall tau comparisons.")
     parser.add_argument("--human-metrics", type=Path, required=True)
     parser.add_argument("--ragdoll-metrics", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)

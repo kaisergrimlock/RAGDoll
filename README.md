@@ -1,8 +1,12 @@
-# Pi-TREC
+<p align="center">
+  <img src="docs/figures/ragdoll-header.svg" alt="RAGDoll: automated evaluation for RAG systems" width="100%">
+</p>
 
-Private Pi/Codex-based runner for TREC RAG evaluation prompts.
+# RAGDoll
 
-Pi-TREC provides local-agent execution for the main TREC RAG evaluation
+Pi-based runner for TREC RAG evaluation.
+
+RAGDoll provides local-agent execution for the main TREC RAG evaluation
 workflow: generating gold-standard artifacts, scoring submitted RAG answers, and
 running optional system-vs-system comparisons. Public inputs and outputs follow
 the corresponding UMBRELA, Nuggetizer, and support-evaluation workflows where
@@ -20,7 +24,7 @@ candidates may be strings or records with `doc.segment`.
 Materialize exact UMBRELA prompts without running Pi:
 
 ```bash
-uv run pi-trec materialize umbrela \
+uv run ragdoll materialize umbrela \
   --input-file examples/umbrela.requests.jsonl \
   --output-file results/umbrela.tasks.jsonl \
   --prompt-type bing
@@ -29,7 +33,7 @@ uv run pi-trec materialize umbrela \
 Run query-candidate relevance judging:
 
 ```bash
-uv run pi-trec umbrela judge \
+uv run ragdoll umbrela judge \
   --input-file examples/umbrela.requests.jsonl \
   --output-file results/umbrela.judgments.jsonl \
   --raw-events-dir results/umbrela.raw-events \
@@ -45,7 +49,7 @@ answer scoring. The basic Nuggetizer path creates and scores nuggets from
 `query` plus `candidates` input:
 
 ```bash
-uv run pi-trec nuggetizer create \
+uv run ragdoll nuggetizer create \
   --input-file examples/nuggetizer.create.jsonl \
   --output-file results/nuggets.jsonl \
   --raw-events-dir results/nugget-create.raw-events \
@@ -59,12 +63,12 @@ role split is visible before execution.
 
 Agentically create nuggets by giving Pi the same search/read-document tool style
 used by Pine. The input contains `query` plus optional starting `nuggets`; the
-agent searches the wrapped Pyserini corpus, reads documents, returns an updated
-nugget list, and Pi-TREC scores that final list with the existing Nuggetizer
+agent searches the wrapped search corpus, reads documents, returns an updated
+nugget list, and RAGDoll scores that final list with the existing Nuggetizer
 scorer prompt:
 
 ```bash
-uv run pi-trec nuggetizer agentic-create \
+uv run ragdoll nuggetizer agentic-create \
   --input-file examples/nuggetizer.agentic-create.jsonl \
   --output-file results/agentic-nuggets.jsonl \
   --failed-output results/agentic-nuggets.failed.jsonl \
@@ -79,7 +83,7 @@ uv run pi-trec nuggetizer agentic-create \
 Materialize the agentic creator prompt without running Pi:
 
 ```bash
-uv run pi-trec materialize nugget-agentic-create \
+uv run ragdoll materialize nugget-agentic-create \
   --input-file examples/nuggetizer.agentic-create.jsonl \
   --output-file results/nugget-agentic-create.tasks.jsonl \
   --max-nuggets 30
@@ -114,24 +118,24 @@ to document IDs.
 }
 ```
 
-First resolve the cited document IDs to passage text. With a Pyserini HTTP API:
+First resolve the cited document IDs to passage text. With an HTTP search API:
 
 ```bash
-uv run pi-trec support resolve-references \
+uv run ragdoll support resolve-references \
   --input-file answers.jsonl \
   --output-file answers.resolved.jsonl \
-  --pyserini-api http://api.castorini.uwaterloo.ca \
-  --pyserini-index msmarco-v2.1-doc-segmented
+  --api-base-url http://api.castorini.uwaterloo.ca \
+  --index msmarco-v2.1-doc-segmented
 ```
 
 Or directly with a Pyserini index. The index can be a local Lucene index path
 or a Pyserini prebuilt index name:
 
 ```bash
-uv run pi-trec support resolve-references \
+uv run ragdoll support resolve-references \
   --input-file answers.jsonl \
   --output-file answers.resolved.jsonl \
-  --pyserini-index msmarco-v2.1-doc-segmented
+  --index msmarco-v2.1-doc-segmented
 ```
 
 The resolved file preserves the original row and adds `topic_id`, `run_id`, and
@@ -158,7 +162,7 @@ the support judge will read.
 Run support judgment on the resolved answer file:
 
 ```bash
-uv run pi-trec support judge \
+uv run ragdoll support judge \
   --input-file answers.resolved.jsonl \
   --output-file judgments.parsed.jsonl \
   --raw-events-dir results/support.raw-events \
@@ -188,7 +192,7 @@ This writes one row per judged sentence/citation pair:
 Assemble the parsed judgments back onto the original answer structure:
 
 ```bash
-uv run pi-trec support assemble \
+uv run ragdoll support assemble \
   --answers-file answers.resolved.jsonl \
   --judgments judgments.parsed.jsonl \
   --output-file support_assignments.jsonl
@@ -223,7 +227,7 @@ and `-1` = missing, failed, or unparseable.
 Compute run/topic support metrics:
 
 ```bash
-uv run pi-trec support metrics \
+uv run ragdoll support metrics \
   --input-file support_assignments.jsonl \
   --output-file support_metrics.jsonl
 ```
@@ -247,7 +251,7 @@ This writes one score row per `(topic_id, run_id)`:
 Optionally export metric rows:
 
 ```bash
-uv run pi-trec support metric-rows \
+uv run ragdoll support metric-rows \
   --input-file support_metrics.jsonl \
   --output-file support_metric_rows.txt
 ```
@@ -264,7 +268,7 @@ assembly, metric computation, and metric-row export after judgments already
 exist:
 
 ```bash
-uv run pi-trec support summarize \
+uv run ragdoll support summarize \
   --answers-dir answers/ \
   --judgments-root judgments/ \
   --output-dir support_scores/
@@ -283,7 +287,7 @@ For Nuggetizer-style assignment runs, `nuggetizer assign` labels nuggets against
 a direct context:
 
 ```bash
-uv run pi-trec nuggetizer assign \
+uv run ragdoll nuggetizer assign \
   --input-json '{"query":"What is Python used for?","context":"Python is used for web development.","nuggets":[{"text":"Python is used for web development.","importance":"vital"}]}' \
   --output-file results/assignments.jsonl \
   --raw-events-dir results/nugget-assign.raw-events \
@@ -297,7 +301,7 @@ semantics: `support`=1.0, `partial_support`=0.5 (non-strict only), vital metrics
 restricted to vital nuggets.
 
 ```bash
-uv run pi-trec nuggetizer metrics \
+uv run ragdoll nuggetizer metrics \
   --input-file results/assignments.jsonl \
   --output-dir results/metrics \
   --reference data/TREC2024/assignment-nist5/human_gold.jsonl
@@ -309,7 +313,7 @@ uv run pi-trec nuggetizer metrics \
 add `--gold` to score against a reference.
 
 ```bash
-uv run pi-trec nuggetizer eval \
+uv run ragdoll nuggetizer eval \
   --nuggets-file data/TREC2024/assignment-nist5/nuggets.jsonl \
   --answers-file data/TREC2024/assignment-nist5/answers.jsonl \
   --gold data/TREC2024/assignment-nist5/human_gold.jsonl \
@@ -326,7 +330,7 @@ answer file is one system/run, using either the normalized `answers` schema from
 citations and references are not rendered in the prompt.
 
 ```bash
-uv run pi-trec arena compare-all \
+uv run ragdoll arena compare-all \
   --answers-dir answers/ \
   --output-dir results/arena \
   --model openai-codex/gpt-5.5 \
@@ -337,7 +341,7 @@ uv run pi-trec arena compare-all \
 `--answers-dir` loads all `*.jsonl` files in sorted filename order. For a small
 ad hoc run, pass repeated `--answers <file>` flags instead.
 
-For every pair of systems, Pi-TREC compares only shared `qid`s and never mixes
+For every pair of systems, RAGDoll compares only shared `qid`s and never mixes
 answers from different questions. Assistant A/B display order is randomized per
 task from `--seed` and recorded in `judgments.jsonl`, so `[[A]]`/`[[B]]`
 verdicts can be mapped back to the original `run_id`. The output directory
@@ -350,7 +354,7 @@ To reduce judge cost, sample a fixed number of shared topics per system pair
 before materialization or judging:
 
 ```bash
-uv run pi-trec arena compare-all \
+uv run ragdoll arena compare-all \
   --answers-dir answers/ \
   --output-dir results/arena-k5 \
   --sample-topics-per-pair 5 \
@@ -363,7 +367,7 @@ each topic instead. This targets a fixed number of battle appearances per
 available system per topic:
 
 ```bash
-uv run pi-trec arena compare-all \
+uv run ragdoll arena compare-all \
   --answers-dir answers/ \
   --output-dir results/arena-d2 \
   --sample-battles-per-system-per-topic 2 \
@@ -373,7 +377,7 @@ uv run pi-trec arena compare-all \
 
 With 76 systems, `--sample-battles-per-system-per-topic 2` materializes about
 76 battles per topic; with 102 systems, it materializes about 102 battles per
-topic. Pi-TREC also supports the absolute `--sample-battles-per-topic <n>` flag
+topic. RAGDoll also supports the absolute `--sample-battles-per-topic <n>` flag
 for fixed-size experiments. The topic and battle sampling flags are mutually
 exclusive.
 
@@ -384,7 +388,7 @@ Leaderboard rows contain `rank`, `run_id`, `arena_score`, `n_judgments`, `wins`,
 `losses`, and `ties`.
 
 Arena scores are fit with the `arena-rank` package from LMArena
-(<https://github.com/lmarena/arena-rank>). Pi-TREC converts each valid judgment
+(<https://github.com/lmarena/arena-rank>). RAGDoll converts each valid judgment
 into the package's standard `model_a`, `model_b`, `winner` schema, with wins as
 `model_a`/`model_b` and ties as `tie`. `arena-rank` then fits the
 Bradley-Terry/logistic paired-comparison model and reports ratings on an
@@ -394,7 +398,7 @@ base-10 log-odds unit.
 Materialize exact judge prompts without running Pi:
 
 ```bash
-uv run pi-trec materialize arena \
+uv run ragdoll materialize arena \
   --answers-dir answers/ \
   --output-file results/arena.tasks.jsonl
 ```
@@ -446,12 +450,12 @@ Useful shared flags include `--agent-binary`, `--model`, `--thinking`,
 `--temperature`, `--max-concurrency`, `--timeout-seconds`, `--raw-events-dir`,
 `--limit`, `--resume`, `--overwrite`, `--dry-run`, `--cache-dir`, `--no-cache`,
 and `-v`/`-q` for logging. `--cache-dir` defaults to the gitignored
-`.cache/pi-trec`; `--no-cache` disables caching for a run so every task hits
+`.cache/ragdoll`; `--no-cache` disables caching for a run so every task hits
 inference.
 
 ## Configuration
 
-Every subcommand is driven by a typed config object in `src/pi_trec/config.py`.
+Every subcommand is driven by a typed config object in `src/ragdoll/config.py`.
 Values come from three layers, later layers winning:
 
 1. dataclass defaults,
@@ -471,23 +475,23 @@ prompt_type: bing
 ```
 
 ```bash
-uv run pi-trec umbrela judge --config examples/configs/umbrela-judge.yaml
-uv run pi-trec umbrela judge --config examples/configs/umbrela-judge.yaml --thinking high
+uv run ragdoll umbrela judge --config examples/configs/umbrela-judge.yaml
+uv run ragdoll umbrela judge --config examples/configs/umbrela-judge.yaml --thinking high
 ```
 
 Required fields such as `input_file` and `output_file` may be supplied through
 either the YAML file or CLI flags. Unknown YAML keys are ignored, so one shared
 file can hold settings for several commands.
 
-## Pyserini Wrapper
+## Castorini Wrapper
 
-Pi-TREC can expose a Pyserini HTTP endpoint as the Pine-compatible `pi-search`
+RAGDoll can expose a search API endpoint as the Pine-compatible `pi-search`
 `http-json` backend contract:
 
 ```bash
-uv run pi-trec serve pyserini-wrapper \
-  --pyserini-base-url http://api.castorini.uwaterloo.ca \
-  --pyserini-index msmarco-v2.1-doc-segmented \
+uv run ragdoll serve castorini-wrapper \
+  --api-base-url http://api.castorini.uwaterloo.ca \
+  --index msmarco-v2.1-doc-segmented \
   --port 8092 \
   --search-word-limit 512 \
   --read-word-limit 4096 \
@@ -496,11 +500,11 @@ uv run pi-trec serve pyserini-wrapper \
 
 The wrapper serves:
 
-- `POST /search`: search requests mapped to Pyserini `/v1/<index>/search`.
-- `POST /read_document`: document reads mapped to Pyserini `/v1/<index>/doc/<docid>`.
+- `POST /search`: search requests mapped to the upstream `/v1/<index>/search`.
+- `POST /read_document`: document reads mapped to the upstream `/v1/<index>/doc/<docid>`.
 - `GET /pi_search_config`: the `PI_SEARCH_EXTENSION_CONFIG` JSON for the Pi search extension.
 
-Protected Pyserini services read bearer tokens from `PYSERINI_API_TOKEN` by
+Protected search APIs read bearer tokens from `CASTORINI_API_TOKEN` by
 default; override that with `--token-env`. The token is never passed as a flag:
 set it in your shell or in a local `.env` file. Values already present in the
 shell environment take precedence over `.env`.
@@ -511,17 +515,17 @@ Convert a TREC RAG answer run into the `answers` schema, and join `answers` plus
 `nuggets` by `qid` into assign payloads for batch assignment:
 
 ```bash
-uv run pi-trec materialize trec-answers --input-file run.jsonl --output-file answers.jsonl
-uv run pi-trec materialize assign-inputs \
+uv run ragdoll materialize trec-answers --input-file run.jsonl --output-file answers.jsonl
+uv run ragdoll materialize assign-inputs \
   --answers-file answers.jsonl --nuggets-file nuggets.jsonl --output-file assign_inputs.jsonl
 ```
 
 ## Operate
 
 ```bash
-uv run pi-trec doctor --probe
-uv run pi-trec validate --input-file data/TREC2024/assignment-nist5/nuggets.jsonl
-uv run pi-trec cost --raw-events-dir results/metrics/../raw-events \
+uv run ragdoll doctor --probe
+uv run ragdoll validate --input-file data/TREC2024/assignment-nist5/nuggets.jsonl
+uv run ragdoll cost --raw-events-dir results/metrics/../raw-events \
   --input-price 0.25 --output-price 2.0
 ```
 

@@ -3,8 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from pi_trec.config import RunConfig, resolve_thinking
-from pi_trec.validate import ValidateConfig, check_row, detect_kind, validate
+from ragdoll.config import RunConfig, resolve_thinking
+from ragdoll.validate import ValidateConfig, check_row, detect_kind, validate
 
 
 def test_detect_kind() -> None:

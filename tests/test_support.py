@@ -2,7 +2,7 @@ import asyncio
 import json
 from pathlib import Path
 
-from pi_trec.config import (
+from ragdoll.config import (
     SupportAssembleConfig,
     SupportJudgeConfig,
     SupportMetricRowsConfig,
@@ -10,7 +10,7 @@ from pi_trec.config import (
     SupportResolveReferencesConfig,
     SupportSummarizeConfig,
 )
-from pi_trec.support import (
+from ragdoll.support import (
     assemble,
     assemble_support_assignments,
     compute_metrics,
@@ -24,7 +24,7 @@ from pi_trec.support import (
     support_metric,
     write_metric_rows,
 )
-from pi_trec.support import resolve as resolve_mod
+from ragdoll.support import resolve as resolve_mod
 
 
 def _fake_agent(tmp_path: Path, output_text: str) -> Path:
@@ -242,7 +242,7 @@ def test_write_metric_rows(tmp_path: Path) -> None:
     assert output_path.read_text(encoding="utf-8") == "r1 14 hard_precision 0\n"
 
 
-def test_resolve_references_with_pyserini_http(tmp_path: Path, monkeypatch) -> None:
+def test_resolve_references_with_api_http(tmp_path: Path, monkeypatch) -> None:
     input_path = tmp_path / "answers.jsonl"
     output_path = tmp_path / "resolved.jsonl"
     input_path.write_text(
@@ -258,19 +258,19 @@ def test_resolve_references_with_pyserini_http(tmp_path: Path, monkeypatch) -> N
     )
 
     def fake_read(config, request_body):
-        assert config.pyserini_base_url == "http://pyserini"
-        assert config.pyserini_index == "climbmix"
+        assert config.api_base_url == "http://api"
+        assert config.index == "climbmix"
         assert request_body["docid"] == "doc-a"
         return {"found": True, "docid": "doc-a", "text": "Resolved passage."}
 
-    monkeypatch.setattr(resolve_mod, "read_pyserini_document", fake_read)
+    monkeypatch.setattr(resolve_mod, "read_backend_document", fake_read)
 
     resolve_references(
         SupportResolveReferencesConfig(
             input_file=input_path,
             output_file=output_path,
-            pyserini_api="http://pyserini",
-            pyserini_index="climbmix",
+            api_base_url="http://api",
+            index="climbmix",
         )
     )
 
@@ -280,7 +280,7 @@ def test_resolve_references_with_pyserini_http(tmp_path: Path, monkeypatch) -> N
     assert row["segments"] == {"doc-a": "Resolved passage."}
 
 
-def test_resolve_references_with_local_pyserini_index(tmp_path: Path, monkeypatch) -> None:
+def test_resolve_references_with_local_index(tmp_path: Path, monkeypatch) -> None:
     input_path = tmp_path / "answers.jsonl"
     output_path = tmp_path / "resolved.jsonl"
     input_path.write_text(
@@ -310,7 +310,7 @@ def test_resolve_references_with_local_pyserini_index(tmp_path: Path, monkeypatc
         SupportResolveReferencesConfig(
             input_file=input_path,
             output_file=output_path,
-            pyserini_index=str(tmp_path / "index"),
+            index=str(tmp_path / "index"),
         )
     )
 
@@ -318,7 +318,7 @@ def test_resolve_references_with_local_pyserini_index(tmp_path: Path, monkeypatc
     assert row["segments"] == {"doc-a": "Doc title: Segment text."}
 
 
-def test_resolve_references_with_pyserini_prebuilt_index(tmp_path: Path, monkeypatch) -> None:
+def test_resolve_references_with_prebuilt_index(tmp_path: Path, monkeypatch) -> None:
     input_path = tmp_path / "answers.jsonl"
     output_path = tmp_path / "resolved.jsonl"
     input_path.write_text(
@@ -353,7 +353,7 @@ def test_resolve_references_with_pyserini_prebuilt_index(tmp_path: Path, monkeyp
         SupportResolveReferencesConfig(
             input_file=input_path,
             output_file=output_path,
-            pyserini_index="msmarco-v2.1-doc-segmented",
+            index="msmarco-v2.1-doc-segmented",
         )
     )
 
@@ -374,8 +374,8 @@ def test_resolve_references_rejects_invalid_citation_index(tmp_path: Path) -> No
             SupportResolveReferencesConfig(
                 input_file=input_path,
                 output_file=output_path,
-                pyserini_api="http://pyserini",
-                pyserini_index="climbmix",
+                api_base_url="http://api",
+                index="climbmix",
             )
         )
     except ValueError as exc:
