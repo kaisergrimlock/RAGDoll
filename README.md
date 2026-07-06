@@ -547,29 +547,33 @@ uv run ragdoll arena compare-all \
   --output-dir results/arena \
   --model openai-codex/gpt-5.5 \
   --thinking medium \
-  --rubrics \
+  --prompt-variant rich-human-voter \
   --overwrite
 ```
 
 `--answers-dir` loads all `*.jsonl` files in sorted filename order. For a small
-ad hoc run, pass repeated `--answers <file>` flags instead. Add `--rubrics` to
-use the rubric-guided judge prompt, which asks the model to compare answers by
-relevance, correctness, completeness, helpfulness, and concision before
-returning the same `[[A]]`/`[[B]]`/tie-style verdict.
-
-Add `--nuggets-file <jsonl>` to include topic-specific nuggets in every
-side-by-side comparison. The nuggets file should contain one JSONL row per
-topic with `qid` and `nuggets`; each nugget may include `text` and
-`importance` (`vital` or `okay`). With this flag, the judge treats the nuggets
-as a topic-specific rubric and records nugget coverage metadata in each task.
-`--rubrics` can be combined with `--nuggets-file` to include both the general
-rubric language and the topic nuggets.
+ad hoc run, pass repeated `--answers <file>` flags instead. The native arena
+judge uses `--prompt-variant rich-human-voter`, which is the final prompt used
+for the reported no-rubric TREC RAG runs.
 
 Add `--rubric-file <jsonl>` to use weighted, topic-specific rubric criteria
-instead of raw nuggets. The rubric file should contain one JSONL row per topic
-with `qid` and `criteria`; each criterion should include `text`, and may include
-`tier`, `weight`, `type`, and `source_nugget`. `--rubric-file` is mutually
-exclusive with `--nuggets-file`.
+with the rubric-guided arena judge:
+
+```bash
+uv run ragdoll arena compare-all \
+  --answers-dir answers/ \
+  --rubric-file rubric.jsonl \
+  --prompt-variant coverage-count \
+  --output-dir results/arena-rubric \
+  --model openai-codex/gpt-5.5 \
+  --thinking medium \
+  --overwrite
+```
+
+The rubric file should contain one JSONL row per topic with `qid` and
+`criteria`; each criterion should include `text`, and may include `tier`,
+`weight`, `type`, and `source_nugget`. The `coverage-count` prompt is the final
+rubric-guided prompt used for the reported TREC RAG rubric runs.
 
 The full TREC RAG and Search Arena side-by-side experiments use fixed prompt
 variants, model settings, seeds, and answer/rubric subsets. The exact
@@ -640,7 +644,7 @@ Materialize exact judge prompts without running Pi:
 uv run ragdoll materialize arena \
   --answers-dir answers/ \
   --output-file results/arena.tasks.jsonl \
-  --rubrics
+  --prompt-variant rich-human-voter
 ```
 
 ## Data

@@ -7,7 +7,7 @@ from typing import Any
 
 from ragdoll.arena.metrics import leaderboard_rows, pairwise_rows, write_csv
 from ragdoll.arena.prompts import parse_verdict
-from ragdoll.arena.stages import coverage_rows, iter_arena_tasks, load_answer_sets, load_nuggets, load_rubrics
+from ragdoll.arena.stages import coverage_rows, iter_arena_tasks, load_answer_sets, load_rubrics
 from ragdoll.config import ArenaCompareAllConfig, MaterializeArenaConfig
 from ragdoll.jsonl import append_jsonl, read_jsonl, write_jsonl
 from ragdoll.runner import run_prompt, select_rows
@@ -23,7 +23,6 @@ def _answer_paths(*, answers: list[Path], answers_dir: Path | None) -> list[Path
 
 def materialize(config: MaterializeArenaConfig) -> None:
     answer_sets = load_answer_sets(_answer_paths(answers=config.answers, answers_dir=config.answers_dir))
-    nuggets_by_qid = load_nuggets(config.nuggets_file) if config.nuggets_file is not None else None
     rubrics_by_qid = load_rubrics(config.rubrics_file) if config.rubrics_file is not None else None
     tasks = iter_arena_tasks(
         answer_sets,
@@ -32,9 +31,6 @@ def materialize(config: MaterializeArenaConfig) -> None:
         sample_battles_per_topic=config.sample_battles_per_topic,
         sample_battles_per_system_per_topic=config.sample_battles_per_system_per_topic,
         sampling_seed=config.sampling_seed,
-        rubrics=config.rubrics,
-        nuggets_by_qid=nuggets_by_qid,
-        nuggets_source=str(config.nuggets_file) if config.nuggets_file is not None else None,
         rubrics_by_qid=rubrics_by_qid,
         rubrics_source=str(config.rubrics_file) if config.rubrics_file is not None else None,
         prompt_variant=config.prompt_variant,
@@ -110,7 +106,6 @@ def _write_summaries(output_dir: Path, judgments_path: Path, coverage: list[dict
 
 async def compare_all(config: ArenaCompareAllConfig) -> None:
     answer_sets = load_answer_sets(_answer_paths(answers=config.answers, answers_dir=config.answers_dir))
-    nuggets_by_qid = load_nuggets(config.nuggets_file) if config.nuggets_file is not None else None
     rubrics_by_qid = load_rubrics(config.rubrics_file) if config.rubrics_file is not None else None
     tasks = iter_arena_tasks(
         answer_sets,
@@ -119,9 +114,6 @@ async def compare_all(config: ArenaCompareAllConfig) -> None:
         sample_battles_per_topic=config.sample_battles_per_topic,
         sample_battles_per_system_per_topic=config.sample_battles_per_system_per_topic,
         sampling_seed=config.sampling_seed,
-        rubrics=config.rubrics,
-        nuggets_by_qid=nuggets_by_qid,
-        nuggets_source=str(config.nuggets_file) if config.nuggets_file is not None else None,
         rubrics_by_qid=rubrics_by_qid,
         rubrics_source=str(config.rubrics_file) if config.rubrics_file is not None else None,
         prompt_variant=config.prompt_variant,

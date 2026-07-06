@@ -2,28 +2,6 @@ from __future__ import annotations
 
 import re
 
-ARENA_JUDGE_PROMPT = """Please act as an impartial judge and evaluate the quality of the responses provided by two AI assistants tasked to answer the user question displayed below. Choose the assistant that best answers the user question.
-
-Your evaluation should consider factors such as correctness, helpfulness, completeness, accuracy, depth, and level of detail. Details are only useful if they answer the user question. If an answer contains non-relevant details, it should not be preferred over one that only uses relevant information.
-
-Avoid any position biases and ensure that the order in which the responses were presented does not influence your decision. Do not allow the length of the responses to influence your evaluation. Be as objective as possible. Lastly, if both responses are citing the same sources of information and offer nearly identical information with minor differences, or if both responses are similarly good or similarly bad, output a tie.
-
-Output your final verdict by strictly following this format:
-"[[A]]" if Assistant A is better, "[[B]]" if Assistant B is better, and "[[Tie]]" for a tie.
-
-[The Start of User's Question]
-{query}
-[The End of User's Question]
-
-[The Start of Assistant A's Answer]
-{answer_a}
-[The End of Assistant A's Answer]
-
-[The Start of Assistant B's Answer]
-{answer_b}
-[The End of Assistant B's Answer]
-"""
-
 ARENA_JUDGE_PROMPT_NATIVE_RICH_HUMAN_VOTER = """Please act as a careful human Search Arena voter. Read the user's question and the two assistant answers, then choose the answer you would rather receive as the user.
 
 Do not use a generic short-answer rubric. First infer what the user is trying to get done, then judge the answer by the dimensions that matter for that request. In search-result comparisons, a strong answer often wins because it gives more useful answer content, not because it is shorter or more polished.
@@ -48,98 +26,6 @@ Output your final verdict by strictly following this format:
 [The Start of User's Question]
 {query}
 [The End of User's Question]
-
-[The Start of Assistant A's Answer]
-{answer_a}
-[The End of Assistant A's Answer]
-
-[The Start of Assistant B's Answer]
-{answer_b}
-[The End of Assistant B's Answer]
-"""
-
-ARENA_JUDGE_PROMPT_W_RUBRICS = """Please act as an impartial judge and evaluate the quality of the responses provided by two AI assistants tasked to answer the user question displayed below. Choose the assistant that best answers the user question.
-
-Your evaluation should consider factors such as correctness, helpfulness, completeness, accuracy, depth, and level of detail. Details are only useful if they answer the user question. If an answer contains non-relevant details, it should not be preferred over one that only uses relevant information.
-
-Use the following rubric when comparing the two answers:
-1. Relevance: The answer directly addresses the user's question and does not drift into unrelated content.
-2. Correctness: The answer is factually accurate, internally consistent, and does not make unsupported claims.
-3. Completeness: The answer covers the key information needed to satisfy the user's question.
-4. Helpfulness: The answer is clear, specific, and useful for the user's likely information need.
-5. Concision: The answer avoids unnecessary detail; length alone should not be rewarded.
-
-Apply the rubric holistically rather than assigning numeric scores. Correctness and relevance should matter most.
-
-Avoid any position biases and ensure that the order in which the responses were presented does not influence your decision. Do not allow the length of the responses to influence your evaluation. Be as objective as possible. Lastly, if neither assistant is clearly better, distinguish between cases where both responses are good and cases where both responses are bad.
-
-Output your final verdict by strictly following this format:
-"[[A]]" if Assistant A is better, "[[B]]" if Assistant B is better, "[[Both Good]]" if both responses satisfy the rubric similarly well, and "[[Both Bad]]" if both responses fail the rubric similarly badly.
-
-[The Start of User's Question]
-{query}
-[The End of User's Question]
-
-[The Start of Assistant A's Answer]
-{answer_a}
-[The End of Assistant A's Answer]
-
-[The Start of Assistant B's Answer]
-{answer_b}
-[The End of Assistant B's Answer]
-"""
-
-ARENA_JUDGE_PROMPT_W_NUGGETS = """Please act as an impartial judge and evaluate the quality of the responses provided by two AI assistants tasked to answer the user question displayed below. Choose the assistant that best answers the user question.
-
-Use the following topic-specific nuggets as a rubric when comparing the two answers. A vital nugget represents information that should be present in a good answer. An okay nugget is useful but less essential. Prefer the answer that better covers the vital nuggets, covers more useful okay nuggets when otherwise comparable, avoids contradicting the nuggets, and stays focused on the user's question. Do not reward an answer merely for being longer.
-
-Avoid any position biases and ensure that the order in which the responses were presented does not influence your decision. Be as objective as possible. Lastly, if both responses cover the nuggets similarly well, or if both responses are similarly good or similarly bad under the nugget rubric, output a tie.
-
-Output your final verdict by strictly following this format:
-"[[A]]" if Assistant A is better, "[[B]]" if Assistant B is better, and "[[Tie]]" for a tie.
-
-[The Start of User's Question]
-{query}
-[The End of User's Question]
-
-[The Start of Topic Nuggets]
-{nuggets}
-[The End of Topic Nuggets]
-
-[The Start of Assistant A's Answer]
-{answer_a}
-[The End of Assistant A's Answer]
-
-[The Start of Assistant B's Answer]
-{answer_b}
-[The End of Assistant B's Answer]
-"""
-
-ARENA_JUDGE_PROMPT_W_RUBRICS_AND_NUGGETS = """Please act as an impartial judge and evaluate the quality of the responses provided by two AI assistants tasked to answer the user question displayed below. Choose the assistant that best answers the user question.
-
-Use the following topic-specific nuggets and rubric when comparing the two answers. A vital nugget represents information that should be present in a good answer. An okay nugget is useful but less essential.
-
-Rubric:
-1. Nugget coverage: The answer covers the vital nuggets and, when otherwise comparable, more useful okay nuggets.
-2. Correctness: The answer is factually accurate, internally consistent, and does not contradict the nuggets.
-3. Relevance: The answer directly addresses the user's question and does not drift into unrelated content.
-4. Completeness: The answer covers the key information needed to satisfy the user's question.
-5. Helpfulness and concision: The answer is clear, specific, and useful without unnecessary detail; length alone should not be rewarded.
-
-Apply the rubric holistically rather than assigning numeric scores. Nugget coverage, correctness, and relevance should matter most.
-
-Avoid any position biases and ensure that the order in which the responses were presented does not influence your decision. Be as objective as possible. Lastly, if both responses cover the nuggets similarly well, or if both responses are similarly good or similarly bad under the rubric, output a tie.
-
-Output your final verdict by strictly following this format:
-"[[A]]" if Assistant A is better, "[[B]]" if Assistant B is better, and "[[Tie]]" for a tie.
-
-[The Start of User's Question]
-{query}
-[The End of User's Question]
-
-[The Start of Topic Nuggets]
-{nuggets}
-[The End of Topic Nuggets]
 
 [The Start of Assistant A's Answer]
 {answer_a}
@@ -185,9 +71,8 @@ Output your final verdict by strictly following this format:
 """
 
 TIE_VERDICTS = frozenset({"Tie", "Both Good", "Both Bad"})
-# Only expose the prompt variants used in the reported arena runs.
 NATIVE_PROMPT_VARIANTS = {
-    "default": ARENA_JUDGE_PROMPT,
+    "default": ARENA_JUDGE_PROMPT_NATIVE_RICH_HUMAN_VOTER,
     "rich-human-voter": ARENA_JUDGE_PROMPT_NATIVE_RICH_HUMAN_VOTER,
 }
 ARENA_JUDGE_PROMPT_W_TOPIC_RUBRIC = ARENA_JUDGE_PROMPT_W_TOPIC_RUBRIC_COVERAGE_COUNT
@@ -204,13 +89,9 @@ def render_arena_prompt(
     query: str,
     answer_a: str,
     answer_b: str,
-    rubrics: bool = False,
-    nuggets: str | None = None,
     rubric: str | None = None,
     prompt_variant: str = "default",
 ) -> str:
-    if rubric is not None and nuggets is not None:
-        raise ValueError("arena prompts accept either topic rubrics or nuggets, not both")
     if rubric is not None:
         prompt = TOPIC_RUBRIC_PROMPT_VARIANTS.get(prompt_variant)
         if prompt is None:
@@ -222,16 +103,10 @@ def render_arena_prompt(
             answer_b=answer_b,
             rubric=rubric,
         )
-    if nuggets is not None:
-        prompt = ARENA_JUDGE_PROMPT_W_RUBRICS_AND_NUGGETS if rubrics else ARENA_JUDGE_PROMPT_W_NUGGETS
-        return prompt.format(query=query, answer_a=answer_a, answer_b=answer_b, nuggets=nuggets)
-    if rubrics:
-        prompt = ARENA_JUDGE_PROMPT_W_RUBRICS
-    else:
-        prompt = NATIVE_PROMPT_VARIANTS.get(prompt_variant)
-        if prompt is None:
-            variants = ", ".join(sorted(NATIVE_PROMPT_VARIANTS))
-            raise ValueError(f"unknown native arena prompt variant {prompt_variant!r}; expected one of: {variants}")
+    prompt = NATIVE_PROMPT_VARIANTS.get(prompt_variant)
+    if prompt is None:
+        variants = ", ".join(sorted(NATIVE_PROMPT_VARIANTS))
+        raise ValueError(f"unknown native arena prompt variant {prompt_variant!r}; expected one of: {variants}")
     return prompt.format(query=query, answer_a=answer_a, answer_b=answer_b)
 
 

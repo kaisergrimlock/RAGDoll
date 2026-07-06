@@ -12,7 +12,6 @@ from ragdoll.arena import (
     leaderboard_rows,
     load_answer_set,
     load_answer_sets,
-    load_nuggets,
     load_rubrics,
     pairwise_rows,
     parse_verdict,
@@ -128,15 +127,12 @@ def test_arena_prompt_uses_answer_text_without_citations_or_references(tmp_path:
     assert "DO_NOT_RENDER_REFERENCE" not in task["instruction"]
 
 
-def test_arena_prompt_can_include_rubrics() -> None:
-    plain = render_arena_prompt(query="q", answer_a="a", answer_b="b")
-    with_rubrics = render_arena_prompt(query="q", answer_a="a", answer_b="b", rubrics=True)
+def test_arena_prompt_default_is_final_native_prompt() -> None:
+    prompt = render_arena_prompt(query="q", answer_a="a", answer_b="b")
 
-    assert "Use the following rubric" not in plain
-    assert "Use the following rubric" in with_rubrics
-    assert "[[A]]" in with_rubrics
-    assert "[[Both Good]]" in with_rubrics
-    assert "[[Both Bad]]" in with_rubrics
+    assert "careful human Search Arena voter" in prompt
+    assert "Answer density" in prompt
+    assert "Topic Rubric" not in prompt
 
 
 def test_arena_prompt_can_use_native_prompt_variants() -> None:
@@ -150,19 +146,6 @@ def test_arena_prompt_can_use_native_prompt_variants() -> None:
 def test_arena_prompt_rejects_deprecated_native_variants() -> None:
     with pytest.raises(ValueError, match="unknown native arena prompt variant"):
         render_arena_prompt(query="q", answer_a="a", answer_b="b", prompt_variant="rich-human-voter-trec")
-
-
-def test_arena_prompt_can_include_nuggets() -> None:
-    with_nuggets = render_arena_prompt(
-        query="q",
-        answer_a="a",
-        answer_b="b",
-        nuggets="1. [vital] Important fact",
-    )
-
-    assert "[The Start of Topic Nuggets]" in with_nuggets
-    assert "1. [vital] Important fact" in with_nuggets
-    assert "[[Tie]]" in with_nuggets
 
 
 def test_arena_prompt_can_include_topic_rubric() -> None:
@@ -223,47 +206,6 @@ def test_arena_prompt_rejects_deprecated_topic_rubric_variants(variant: str) -> 
             rubric="1. [mandatory, weight=5] Important criterion",
             prompt_variant=variant,
         )
-
-
-def test_iter_arena_tasks_can_use_rubric_prompt(tmp_path: Path) -> None:
-    left = _write(tmp_path / "a.jsonl", [{"run_id": "sys-a", "qid": "q1", "query": "q", "answer_text": "a"}])
-    right = _write(tmp_path / "b.jsonl", [{"run_id": "sys-b", "qid": "q1", "query": "q", "answer_text": "b"}])
-
-    task = iter_arena_tasks(load_answer_sets([left, right]), seed=13, rubrics=True)[0]
-
-    assert "Use the following rubric" in task["instruction"]
-    assert task["metadata"]["rubrics"] is True
-
-
-def test_iter_arena_tasks_can_use_nugget_prompt(tmp_path: Path) -> None:
-    left = _write(tmp_path / "a.jsonl", [{"run_id": "sys-a", "qid": "q1", "query": "q", "answer_text": "a"}])
-    right = _write(tmp_path / "b.jsonl", [{"run_id": "sys-b", "qid": "q1", "query": "q", "answer_text": "b"}])
-    nuggets = _write(
-        tmp_path / "nuggets.jsonl",
-        [
-            {
-                "qid": "q1",
-                "nuggets": [
-                    {"text": "Important fact", "importance": "vital"},
-                    {"text": "Useful detail", "importance": "okay"},
-                ],
-            }
-        ],
-    )
-
-    task = iter_arena_tasks(
-        load_answer_sets([left, right]),
-        seed=13,
-        nuggets_by_qid=load_nuggets(nuggets),
-        nuggets_source=str(nuggets),
-    )[0]
-
-    assert "1. [vital] Important fact" in task["instruction"]
-    assert "2. [okay] Useful detail" in task["instruction"]
-    assert task["metadata"]["nuggets"] is True
-    assert task["metadata"]["nuggets_count"] == 2
-    assert task["metadata"]["vital_nuggets_count"] == 1
-    assert task["metadata"]["nuggets_source"] == str(nuggets)
 
 
 def test_iter_arena_tasks_can_use_topic_rubric_prompt(tmp_path: Path) -> None:
@@ -333,15 +275,6 @@ def test_iter_arena_tasks_records_native_prompt_variant(tmp_path: Path) -> None:
     assert task["metadata"]["prompt_variant"] == "rich-human-voter"
 
 
-def test_iter_arena_tasks_rejects_missing_nuggets(tmp_path: Path) -> None:
-    left = _write(tmp_path / "a.jsonl", [{"run_id": "sys-a", "qid": "q1", "query": "q", "answer_text": "a"}])
-    right = _write(tmp_path / "b.jsonl", [{"run_id": "sys-b", "qid": "q1", "query": "q", "answer_text": "b"}])
-    nuggets = _write(tmp_path / "nuggets.jsonl", [{"qid": "q2", "nuggets": [{"text": "Other fact"}]}])
-
-    with pytest.raises(ValueError, match="missing nuggets"):
-        iter_arena_tasks(load_answer_sets([left, right]), seed=13, nuggets_by_qid=load_nuggets(nuggets))
-
-
 def test_iter_arena_tasks_rejects_missing_topic_rubric(tmp_path: Path) -> None:
     left = _write(tmp_path / "a.jsonl", [{"run_id": "sys-a", "qid": "q1", "query": "q", "answer_text": "a"}])
     right = _write(tmp_path / "b.jsonl", [{"run_id": "sys-b", "qid": "q1", "query": "q", "answer_text": "b"}])
@@ -352,21 +285,6 @@ def test_iter_arena_tasks_rejects_missing_topic_rubric(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="missing rubrics"):
         iter_arena_tasks(load_answer_sets([left, right]), seed=13, rubrics_by_qid=load_rubrics(rubrics))
-
-
-def test_iter_arena_tasks_rejects_mixing_nuggets_and_topic_rubrics(tmp_path: Path) -> None:
-    left = _write(tmp_path / "a.jsonl", [{"run_id": "sys-a", "qid": "q1", "query": "q", "answer_text": "a"}])
-    right = _write(tmp_path / "b.jsonl", [{"run_id": "sys-b", "qid": "q1", "query": "q", "answer_text": "b"}])
-    nuggets = _write(tmp_path / "nuggets.jsonl", [{"qid": "q1", "nuggets": [{"text": "Important fact"}]}])
-    rubrics = _write(tmp_path / "rubric.jsonl", [{"qid": "q1", "status": "completed", "criteria": [{"text": "Criterion"}]}])
-
-    with pytest.raises(ValueError, match="either nuggets_by_qid or rubrics_by_qid"):
-        iter_arena_tasks(
-            load_answer_sets([left, right]),
-            seed=13,
-            nuggets_by_qid=load_nuggets(nuggets),
-            rubrics_by_qid=load_rubrics(rubrics),
-        )
 
 
 def test_pairing_uses_shared_qids_and_reports_coverage(tmp_path: Path) -> None:
@@ -691,65 +609,6 @@ def test_materialize_arena_cli_samples_battles_per_system_per_topic(tmp_path: Pa
     assert len(rows) == 4
 
 
-def test_materialize_arena_cli_accepts_rubrics_flag(tmp_path: Path, monkeypatch) -> None:
-    left = _write(tmp_path / "a.jsonl", [{"run_id": "sys-a", "qid": "q1", "query": "q", "answer_text": "a"}])
-    right = _write(tmp_path / "b.jsonl", [{"run_id": "sys-b", "qid": "q1", "query": "q", "answer_text": "b"}])
-    output = tmp_path / "tasks.jsonl"
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        [
-            "ragdoll",
-            "materialize",
-            "arena",
-            "--answers",
-            str(left),
-            "--answers",
-            str(right),
-            "--output-file",
-            str(output),
-            "--rubrics",
-        ],
-    )
-
-    main()
-
-    row = json.loads(output.read_text(encoding="utf-8"))
-    assert "Use the following rubric" in row["instruction"]
-    assert row["metadata"]["rubrics"] is True
-
-
-def test_materialize_arena_cli_accepts_nuggets_file(tmp_path: Path, monkeypatch) -> None:
-    left = _write(tmp_path / "a.jsonl", [{"run_id": "sys-a", "qid": "q1", "query": "q", "answer_text": "a"}])
-    right = _write(tmp_path / "b.jsonl", [{"run_id": "sys-b", "qid": "q1", "query": "q", "answer_text": "b"}])
-    nuggets = _write(tmp_path / "nuggets.jsonl", [{"qid": "q1", "nuggets": [{"text": "Important fact", "importance": "vital"}]}])
-    output = tmp_path / "tasks.jsonl"
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        [
-            "ragdoll",
-            "materialize",
-            "arena",
-            "--answers",
-            str(left),
-            "--answers",
-            str(right),
-            "--output-file",
-            str(output),
-            "--nuggets-file",
-            str(nuggets),
-        ],
-    )
-
-    main()
-
-    row = json.loads(output.read_text(encoding="utf-8"))
-    assert "Topic Nuggets" in row["instruction"]
-    assert "[vital] Important fact" in row["instruction"]
-    assert row["metadata"]["nuggets"] is True
-
-
 def test_materialize_arena_cli_accepts_rubric_file(tmp_path: Path, monkeypatch) -> None:
     left = _write(tmp_path / "a.jsonl", [{"run_id": "sys-a", "qid": "q1", "query": "q", "answer_text": "a"}])
     right = _write(tmp_path / "b.jsonl", [{"run_id": "sys-b", "qid": "q1", "query": "q", "answer_text": "b"}])
@@ -819,13 +678,6 @@ print(json.dumps({"type":"message_end","message":{"role":"assistant","content":"
             {"run_id": "sys-b", "qid": "q2", "query": "q2", "answer_text": "b2"},
         ],
     )
-    nuggets = _write(
-        tmp_path / "nuggets.jsonl",
-        [
-            {"qid": "q1", "nuggets": [{"text": "Important q1 fact", "importance": "vital"}]},
-            {"qid": "q2", "nuggets": [{"text": "Important q2 fact", "importance": "vital"}]},
-        ],
-    )
     output_dir = tmp_path / "arena"
     monkeypatch.setattr(
         sys,
@@ -848,9 +700,6 @@ print(json.dumps({"type":"message_end","message":{"role":"assistant","content":"
             "judge-model",
             "--thinking",
             "medium",
-            "--rubrics",
-            "--nuggets-file",
-            str(nuggets),
             "--max-concurrency",
             "1",
             "--no-cache",
@@ -868,9 +717,8 @@ print(json.dumps({"type":"message_end","message":{"role":"assistant","content":"
     assert len(leaderboard) == 2
     assert (output_dir / "tasks.jsonl").exists()
     tasks_text = (output_dir / "tasks.jsonl").read_text(encoding="utf-8")
-    assert "Rubric:" in tasks_text
-    assert "Nugget coverage" in tasks_text
-    assert "Topic Nuggets" in tasks_text
+    assert "careful human Search Arena voter" in tasks_text
+    assert "Topic Rubric" not in tasks_text
     assert (output_dir / "pairwise.csv").exists()
     assert (output_dir / "coverage.csv").exists()
 
