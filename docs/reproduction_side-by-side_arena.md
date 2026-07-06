@@ -70,10 +70,12 @@ For the reported TREC RAG runs, prepare these answer directories:
 | RAG24 native | 20 rubric/NIST nugget topics, 45 systems |
 | RAG24 rubric-guided | same 20-topic directory as RAG24 native |
 | RAG25 native | 22 qrel topics, 76 systems |
-| RAG25 rubric-guided | 20 rubric-covered topics, 76 systems |
+| RAG25 rubric-guided | same 22-topic qrel directory as RAG25 native |
 
-The RAG25 rubric-guided subset has 20 topics because the GPT-5.5 nugget-rubric
-file used for that run did not cover qids `72` and `225`.
+The RAG25 rubric-guided ablation now uses the full 22-topic qrel subset. The
+original GPT-5.5 nugget-rubric file covered 20 topics; qids `72` and `225` were
+added from the follow-up GPT-5.5 E2E rubric file to form the qrels22 rubric
+file used below.
 
 ---
 
@@ -100,6 +102,15 @@ Rubric-guided TREC runs use one JSONL row per topic:
 The side-by-side judge uses `criteria[].text`, while `tier`, `weight`, `type`,
 and `source_nugget` are preserved in the rendered prompt for priority and
 provenance.
+
+For TREC RAG 2025, the full 22-topic rubric file is:
+
+```text
+data/side-by-side/rag25/rubric-trec-rag-2025-gpt55-nuggets-qrels22.jsonl
+```
+
+It is the 20-topic GPT-5.5 nugget-rubric file plus the two missing rubric rows
+for qids `72` and `225`.
 
 ---
 
@@ -147,22 +158,26 @@ uv run ragdoll arena compare-all \
 Rubric-guided TREC runs use the same arena pipeline, plus `--rubric-file` and
 the `coverage-count` prompt variant.
 
-### RAG25 Rubric-Guided, 20 Rubric Topics
+### RAG25 Rubric-Guided, 22 Qrel Topics
 
 ```bash
 uv run ragdoll arena compare-all \
-  --answers-dir data/side-by-side/rag25/answers-rubric20 \
-  --rubric-file data/side-by-side/rag25/rubric-trec-rag-2025-gpt55-nuggets.jsonl \
+  --answers-dir data/side-by-side/rag25/answers-qrels22 \
+  --rubric-file data/side-by-side/rag25/rubric-trec-rag-2025-gpt55-nuggets-qrels22.jsonl \
   --prompt-variant coverage-count \
-  --output-dir results/side-by-side/rag25/rubric-gpt55-medium-coverage-count-rubric20 \
+  --output-dir results/side-by-side/rag25/rubric-gpt55-medium-coverage-count-qrels22 \
   --model openai-codex/gpt-5.5 \
   --thinking medium \
-  --max-concurrency 24 \
+  --max-concurrency 6 \
   --timeout-seconds 420 \
   --resume \
   --shuffle \
   --seed 20260702
 ```
+
+The historical 20-topic output directory,
+`results/side-by-side/rag25/rubric-gpt55-medium-coverage-count-rubric20`, is not
+the clean ablation against the qrels22 native run.
 
 ### RAG24 Rubric-Guided, 20 Rubric Topics
 
@@ -254,8 +269,14 @@ Quick count checks:
 ```bash
 wc -l results/side-by-side/rag25/native-gpt55-medium-rich-human-voter-qrels22/tasks.jsonl
 wc -l results/side-by-side/rag25/native-gpt55-medium-rich-human-voter-qrels22/judgments.jsonl
+wc -l results/side-by-side/rag25/rubric-gpt55-medium-coverage-count-qrels22/tasks.jsonl
+wc -l results/side-by-side/rag25/rubric-gpt55-medium-coverage-count-qrels22/judgments.jsonl
 sed -n '1,20p' results/search-arena-prompt-search/gpt55-high-full-rich-human-voter/summary.csv
 ```
+
+For the completed RAG25 qrels22 runs, both native and rubric-guided task files
+contain 62,475 tasks. The rubric-guided qrels22 run has 62,475 completed
+judgments and zero failed final rows.
 
 ---
 
@@ -301,3 +322,18 @@ PY
 
 Search Arena `summary.csv` already includes Kendall tau and Spearman against the
 human Bradley--Terry leaderboard.
+
+### Reported TREC RAG 2025 GPT-5.5 qrels22 Results
+
+Using the NIST post-edit final dump aggregate (`qid=all`) as the RAG25 human
+run-level reference, the clean 22-topic ablation is:
+
+| Condition | Topics | Systems | Tasks completed | Human metric | Kendall tau-b | Spearman |
+|---|---:|---:|---:|---|---:|---:|
+| Native, `rich-human-voter` | 22 | 76 | 62,475 / 62,475 | `strict_vital_score` | 0.798942 | 0.928475 |
+| Rubric-guided, `coverage-count` | 22 | 76 | 62,475 / 62,475 | `strict_vital_score` | 0.858249 | 0.967447 |
+| Native, `rich-human-voter` | 22 | 76 | 62,475 / 62,475 | `sub_coverage` | 0.733556 | 0.888792 |
+| Rubric-guided, `coverage-count` | 22 | 76 | 62,475 / 62,475 | `sub_coverage` | 0.772047 | 0.925472 |
+
+For topic-level diagnostics on `strict_vital_score`, the mean per-topic
+Kendall tau-b is 0.612574 for native and 0.635631 for rubric-guided.
