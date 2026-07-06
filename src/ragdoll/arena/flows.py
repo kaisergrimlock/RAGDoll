@@ -7,7 +7,7 @@ from typing import Any
 
 from ragdoll.arena.metrics import leaderboard_rows, pairwise_rows, write_csv
 from ragdoll.arena.prompts import parse_verdict
-from ragdoll.arena.stages import coverage_rows, iter_arena_tasks, load_answer_sets
+from ragdoll.arena.stages import coverage_rows, iter_arena_tasks, load_answer_sets, load_rubrics
 from ragdoll.config import ArenaCompareAllConfig, MaterializeArenaConfig
 from ragdoll.jsonl import append_jsonl, read_jsonl, write_jsonl
 from ragdoll.runner import run_prompt, select_rows
@@ -23,6 +23,7 @@ def _answer_paths(*, answers: list[Path], answers_dir: Path | None) -> list[Path
 
 def materialize(config: MaterializeArenaConfig) -> None:
     answer_sets = load_answer_sets(_answer_paths(answers=config.answers, answers_dir=config.answers_dir))
+    rubrics_by_qid = load_rubrics(config.rubrics_file) if config.rubrics_file is not None else None
     tasks = iter_arena_tasks(
         answer_sets,
         seed=config.seed,
@@ -30,6 +31,9 @@ def materialize(config: MaterializeArenaConfig) -> None:
         sample_battles_per_topic=config.sample_battles_per_topic,
         sample_battles_per_system_per_topic=config.sample_battles_per_system_per_topic,
         sampling_seed=config.sampling_seed,
+        rubrics_by_qid=rubrics_by_qid,
+        rubrics_source=str(config.rubrics_file) if config.rubrics_file is not None else None,
+        prompt_variant=config.prompt_variant,
     )
     count = write_jsonl(config.output_file, tasks)
     print(f"wrote={count} output={config.output_file}")
@@ -102,6 +106,7 @@ def _write_summaries(output_dir: Path, judgments_path: Path, coverage: list[dict
 
 async def compare_all(config: ArenaCompareAllConfig) -> None:
     answer_sets = load_answer_sets(_answer_paths(answers=config.answers, answers_dir=config.answers_dir))
+    rubrics_by_qid = load_rubrics(config.rubrics_file) if config.rubrics_file is not None else None
     tasks = iter_arena_tasks(
         answer_sets,
         seed=config.seed,
@@ -109,6 +114,9 @@ async def compare_all(config: ArenaCompareAllConfig) -> None:
         sample_battles_per_topic=config.sample_battles_per_topic,
         sample_battles_per_system_per_topic=config.sample_battles_per_system_per_topic,
         sampling_seed=config.sampling_seed,
+        rubrics_by_qid=rubrics_by_qid,
+        rubrics_source=str(config.rubrics_file) if config.rubrics_file is not None else None,
+        prompt_variant=config.prompt_variant,
     )
 
     if config.dry_run:
@@ -151,11 +159,23 @@ async def compare_all(config: ArenaCompareAllConfig) -> None:
             )
             return _judgment_row(task, result)
 
-    pending = [asyncio.create_task(one(task)) for task in selected]
-    for future in asyncio.as_completed(pending):
-        row = await future
-        append_jsonl(judgments_path, row)
-        print(f"{row['status']} task_id={row['task_id']}", flush=True)
+    selected_iter = iter(selected)
+
+    async def worker() -> int:
+        processed = 0
+        while True:
+            try:
+                task = next(selected_iter)
+            except StopIteration:
+                return processed
+            row = await one(task)
+            append_jsonl(judgments_path, row)
+            print(f"{row['status']} task_id={row['task_id']}", flush=True)
+            processed += 1
+
+    worker_count = min(max(1, config.max_concurrency), len(selected))
+    if worker_count:
+        await asyncio.gather(*(worker() for _ in range(worker_count)))
 
     _write_summaries(output_dir, judgments_path, coverage, [answer_set.run_id for answer_set in answer_sets])
     print(f"processed={len(selected)} output_dir={output_dir} raw_events_dir={raw_events_dir}")
