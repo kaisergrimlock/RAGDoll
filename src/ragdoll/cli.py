@@ -167,25 +167,10 @@ def build_parser() -> argparse.ArgumentParser:
         choices=[
             "default",
             "rich-human-voter",
-            "rich-human-voter-trec",
-            "strict-vital",
-            "dimensions",
-            "checklist",
             "coverage-count",
-            "coverage-quality",
-            "coverage-accuracy-gate",
-            "coverage-helpful-depth",
-            "coverage-compact-dimensions",
-            "coverage-compact-tiebreak",
-            "coverage-compact-calibrated",
-            "support-plus",
-            "balanced-dimensions",
-            "question-first-dimensions",
-            "expert-preference",
-            "strict-support",
         ],
         default=SUPPRESS,
-        help="Arena prompt variant for topic-specific rubric comparisons.",
+        help="Arena prompt variant.",
     )
     finish(materialize_arena, config_cls=MaterializeArenaConfig, handler=arena.materialize)
 
@@ -497,25 +482,10 @@ def add_arena_compare_args(parser: argparse.ArgumentParser) -> None:
         choices=[
             "default",
             "rich-human-voter",
-            "rich-human-voter-trec",
-            "strict-vital",
-            "dimensions",
-            "checklist",
             "coverage-count",
-            "coverage-quality",
-            "coverage-accuracy-gate",
-            "coverage-helpful-depth",
-            "coverage-compact-dimensions",
-            "coverage-compact-tiebreak",
-            "coverage-compact-calibrated",
-            "support-plus",
-            "balanced-dimensions",
-            "question-first-dimensions",
-            "expert-preference",
-            "strict-support",
         ],
         default=SUPPRESS,
-        help="Arena prompt variant for topic-specific rubric comparisons.",
+        help="Arena prompt variant.",
     )
     parser.add_argument("--raw-events-dir", type=Path, default=SUPPRESS)
     parser.add_argument("--agent-binary", default=SUPPRESS)

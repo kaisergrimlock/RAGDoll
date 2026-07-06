@@ -141,14 +141,15 @@ def test_arena_prompt_can_include_rubrics() -> None:
 
 def test_arena_prompt_can_use_native_prompt_variants() -> None:
     rich = render_arena_prompt(query="q", answer_a="a", answer_b="b", prompt_variant="rich-human-voter")
-    trec = render_arena_prompt(query="q", answer_a="a", answer_b="b", prompt_variant="rich-human-voter-trec")
 
     assert "careful human Search Arena voter" in rich
     assert "Answer density" in rich
     assert "Topic Rubric" not in rich
-    assert "careful human TREC RAG side-by-side voter" in trec
-    assert "Do not write explanation or analysis" in trec
-    assert "[[Tie]]" in trec
+
+
+def test_arena_prompt_rejects_deprecated_native_variants() -> None:
+    with pytest.raises(ValueError, match="unknown native arena prompt variant"):
+        render_arena_prompt(query="q", answer_a="a", answer_b="b", prompt_variant="rich-human-voter-trec")
 
 
 def test_arena_prompt_can_include_nuggets() -> None:
@@ -179,66 +180,49 @@ def test_arena_prompt_can_include_topic_rubric() -> None:
     assert "[[Both Bad]]" in with_rubric
 
 
-def test_arena_prompt_can_use_strict_vital_topic_rubric_variant() -> None:
+def test_arena_prompt_can_use_coverage_count_topic_rubric_variant() -> None:
     with_rubric = render_arena_prompt(
         query="q",
         answer_a="a",
         answer_b="b",
         rubric="1. [mandatory, weight=5] Important criterion",
-        prompt_variant="strict-vital",
+        prompt_variant="coverage-count",
     )
 
     assert "higher strict-vital human nugget score" in with_rubric
-    assert "Mandatory rubric coverage" in with_rubric
+    assert "higher supported mandatory-criterion coverage" in with_rubric
     assert "[[Both Good]]" in with_rubric
     assert "[[Both Bad]]" in with_rubric
 
 
-def test_arena_prompt_can_use_expanded_coverage_variants() -> None:
-    expected_phrases = {
-        "coverage-quality": "correct, useful, complete, and precise information",
-        "coverage-accuracy-gate": "Treat correctness and accuracy as gates for coverage",
-        "coverage-helpful-depth": "more helpful, complete, well-synthesized, and appropriately detailed",
-        "coverage-compact-dimensions": "Use these quality dimensions only to decide whether mandatory criteria are truly supported",
-        "coverage-compact-tiebreak": "Then use these answer-quality dimensions to resolve close comparisons",
-        "coverage-compact-calibrated": "calibration means it states uncertainty or limits when warranted",
-        "support-plus": "Use these answer-quality dimensions as evidence for support quality",
-    }
-
-    for variant, phrase in expected_phrases.items():
-        with_rubric = render_arena_prompt(
+@pytest.mark.parametrize(
+    "variant",
+    [
+        "strict-vital",
+        "dimensions",
+        "checklist",
+        "coverage-quality",
+        "coverage-accuracy-gate",
+        "coverage-helpful-depth",
+        "coverage-compact-dimensions",
+        "coverage-compact-tiebreak",
+        "coverage-compact-calibrated",
+        "support-plus",
+        "balanced-dimensions",
+        "question-first-dimensions",
+        "expert-preference",
+        "strict-support",
+    ],
+)
+def test_arena_prompt_rejects_deprecated_topic_rubric_variants(variant: str) -> None:
+    with pytest.raises(ValueError, match="unknown topic rubric prompt variant"):
+        render_arena_prompt(
             query="q",
             answer_a="a",
             answer_b="b",
             rubric="1. [mandatory, weight=5] Important criterion",
             prompt_variant=variant,
         )
-
-        assert phrase in with_rubric
-        assert "[[Both Good]]" in with_rubric
-        assert "[[Both Bad]]" in with_rubric
-
-
-def test_arena_prompt_can_use_rubric_light_dimension_variants() -> None:
-    expected_phrases = {
-        "balanced-dimensions": "do not reduce the decision to a checklist count",
-        "question-first-dimensions": "Start from the user's question, not from the rubric",
-        "expert-preference": "side-by-side preference judgment rather than a rubric-scoring task",
-    }
-
-    for variant, phrase in expected_phrases.items():
-        with_rubric = render_arena_prompt(
-            query="q",
-            answer_a="a",
-            answer_b="b",
-            rubric="1. [mandatory, weight=5] Important criterion",
-            prompt_variant=variant,
-        )
-
-        assert phrase in with_rubric
-        assert "Completeness and balance" in with_rubric
-        assert "[[Both Good]]" in with_rubric
-        assert "[[Both Bad]]" in with_rubric
 
 
 def test_iter_arena_tasks_can_use_rubric_prompt(tmp_path: Path) -> None:
@@ -327,11 +311,11 @@ def test_iter_arena_tasks_records_prompt_variant(tmp_path: Path) -> None:
         load_answer_sets([left, right]),
         seed=13,
         rubrics_by_qid=load_rubrics(rubrics),
-        prompt_variant="strict-vital",
+        prompt_variant="coverage-count",
     )[0]
 
     assert "higher strict-vital human nugget score" in task["instruction"]
-    assert task["metadata"]["prompt_variant"] == "strict-vital"
+    assert task["metadata"]["prompt_variant"] == "coverage-count"
 
 
 def test_iter_arena_tasks_records_native_prompt_variant(tmp_path: Path) -> None:
@@ -341,12 +325,12 @@ def test_iter_arena_tasks_records_native_prompt_variant(tmp_path: Path) -> None:
     task = iter_arena_tasks(
         load_answer_sets([left, right]),
         seed=13,
-        prompt_variant="rich-human-voter-trec",
+        prompt_variant="rich-human-voter",
     )[0]
 
-    assert "careful human TREC RAG side-by-side voter" in task["instruction"]
+    assert "careful human Search Arena voter" in task["instruction"]
     assert "Topic Rubric" not in task["instruction"]
-    assert task["metadata"]["prompt_variant"] == "rich-human-voter-trec"
+    assert task["metadata"]["prompt_variant"] == "rich-human-voter"
 
 
 def test_iter_arena_tasks_rejects_missing_nuggets(tmp_path: Path) -> None:
@@ -796,7 +780,7 @@ def test_materialize_arena_cli_accepts_rubric_file(tmp_path: Path, monkeypatch) 
             "--rubric-file",
             str(rubrics),
             "--prompt-variant",
-            "strict-vital",
+            "coverage-count",
         ],
     )
 
@@ -807,7 +791,7 @@ def test_materialize_arena_cli_accepts_rubric_file(tmp_path: Path, monkeypatch) 
     assert "higher strict-vital human nugget score" in row["instruction"]
     assert "[mandatory, weight=5] Important criterion" in row["instruction"]
     assert row["metadata"]["rubrics"] is True
-    assert row["metadata"]["prompt_variant"] == "strict-vital"
+    assert row["metadata"]["prompt_variant"] == "coverage-count"
     assert row["metadata"]["rubric_criteria_count"] == 1
 
 
