@@ -8,6 +8,7 @@ import json
 import os
 import random
 import shutil
+import sys
 import tempfile
 import time
 from collections.abc import Iterable
@@ -26,6 +27,19 @@ from ragdoll.config import (
     RunConfig,
 )
 from ragdoll.jsonl import append_jsonl, completed_task_ids, read_jsonl
+
+
+def _agent_command(agent_binary: str) -> tuple[str, ...]:
+    """Return an executable command prefix for an agent binary.
+
+    Python scripts are executable through a shebang on POSIX, but Windows does
+    not honor shebangs when ``CreateProcess`` is used by asyncio.  Invoking the
+    script with the current interpreter keeps explicit ``--agent-binary``
+    Python scripts (including the test agents) portable.
+    """
+    if Path(agent_binary).suffix.casefold() in {".py", ".pyw"}:
+        return (sys.executable, agent_binary)
+    return (agent_binary,)
 
 __all__ = [
     "CACHE_TTL_SECONDS",
@@ -327,7 +341,7 @@ async def run_prompt(
         }
         try:
             process = await asyncio.create_subprocess_exec(
-                config.agent_binary,
+                *_agent_command(config.agent_binary),
                 *build_agent_args(
                     model=config.model,
                     thinking=config.thinking,
