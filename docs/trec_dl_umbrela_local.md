@@ -75,3 +75,14 @@ python tools/run_jev_umbrela.py \
 The output retains RAGDoll-compatible `qid`, `docid`, `passage`, and
 `judgment` fields, with Jev choice and confidence fields added. Re-running the
 same command resumes completed tasks unless `--overwrite` is supplied.
+
+Score Jev against the original relevance labels with:
+
+```bash
+python scoring/score_jev_umbrela.py \
+  --gold-file results/trec_dl_2021.gold.csv \
+  --judgments-file results/trec_dl_2021.jev.judgments.jsonl
+```
+
+This reports overall MAE, query-macro-averaged MAE, exact accuracy, MAE by
+gold grade, and a gold-versus-Jev confusion table.
