@@ -431,6 +431,12 @@ def add_runner_args(parser: argparse.ArgumentParser, *, include_input_file: bool
         default=SUPPRESS,
         help="Sampling temperature. Unset by default (required for gpt-5* models).",
     )
+    parser.add_argument(
+        "--max-tokens",
+        type=int,
+        default=SUPPRESS,
+        help="Maximum output tokens for Bedrock Converse requests (default: 2048).",
+    )
     cache_group = parser.add_mutually_exclusive_group()
     cache_group.add_argument(
         "--cache-dir",

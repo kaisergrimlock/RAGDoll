@@ -1,4 +1,4 @@
-"""Pi local-agent runner."""
+"""Prompt runner for Pi-compatible agents and Amazon Bedrock Converse."""
 
 from __future__ import annotations
 
@@ -324,6 +324,18 @@ async def run_prompt(
             cached.pop("cached_at", None)
             return {**cached, "task_id": task_id, "metadata": metadata or {}, "cached": True}
 
+    if config.provider.casefold() in {"bedrock", "amazon-bedrock", "amazon_bedrock"}:
+        return await _run_bedrock_prompt(
+            task_id=task_id,
+            evaluator=evaluator,
+            instruction=instruction,
+            raw_events_path=raw_events_path,
+            config=config,
+            metadata=metadata,
+            cache_path=cache_path,
+            start=start,
+        )
+
     with tempfile.TemporaryDirectory(prefix="ragdoll-") as tmp:
         tmp_path = Path(tmp)
         prompt_path = tmp_path / "prompt.txt"
@@ -471,6 +483,89 @@ async def run_prompt(
         except OSError:
             pass
     return result
+
+
+async def _run_bedrock_prompt(
+    *,
+    task_id: str,
+    evaluator: str,
+    instruction: str,
+    raw_events_path: Path,
+    config: LocalAgentConfig,
+    metadata: dict[str, Any] | None,
+    cache_path: Path | None,
+    start: float,
+) -> dict[str, Any]:
+    """Run one prompt through Bedrock's Converse API."""
+    try:
+        import boto3
+    except ImportError:
+        return result_row(
+            task_id=task_id, evaluator=evaluator, config=config, output_text="", status="failed",
+            error="Bedrock provider requires boto3; install the project dependencies first.",
+            elapsed_seconds=time.time() - start, metadata=metadata,
+        )
+
+    model_id = config.model.split("/", 1)[1] if "/" in config.model else config.model
+    region = os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION")
+    try:
+        client = boto3.client("bedrock-runtime", region_name=region)
+        request: dict[str, Any] = {
+            "modelId": model_id,
+            "messages": [{"role": "user", "content": [{"text": instruction}]}],
+            "inferenceConfig": {"maxTokens": config.max_tokens},
+        }
+        if config.temperature is not None:
+            request["inferenceConfig"]["temperature"] = config.temperature
+        response = await asyncio.wait_for(
+            asyncio.to_thread(client.converse, **request), timeout=config.timeout_seconds
+        )
+        content = response.get("output", {}).get("message", {}).get("content", [])
+        output_text = "\n".join(
+            item.get("text", "") for item in content if isinstance(item, dict) and item.get("text")
+        ).strip()
+        usage_raw = response.get("usage", {})
+        usage = {
+            "input_tokens": int(usage_raw.get("inputTokens", 0)),
+            "output_tokens": int(usage_raw.get("outputTokens", 0)),
+            "total_tokens": int(usage_raw.get("totalTokens", 0)),
+        }
+        raw_events_path.write_text(
+            json.dumps({
+                "type": "bedrock_converse_response",
+                "provider": "bedrock",
+                "model": model_id,
+                "output_text": output_text,
+                "usage": usage,
+                "response": response,
+            }, ensure_ascii=False, default=str) + "\n",
+            encoding="utf-8",
+        )
+        if not output_text:
+            raise RuntimeError("Bedrock returned no text content")
+        result = result_row(
+            task_id=task_id, evaluator=evaluator, config=config, output_text=output_text,
+            status="completed", error=None, elapsed_seconds=time.time() - start,
+            metadata=metadata, usage=usage,
+        )
+        if cache_path is not None:
+            try:
+                write_cache(cache_path, result, now=time.time())
+            except OSError:
+                pass
+        return result
+    except asyncio.TimeoutError:
+        return result_row(
+            task_id=task_id, evaluator=evaluator, config=config, output_text="", status="failed",
+            error=f"TimeoutError: Bedrock task exceeded {config.timeout_seconds:g} seconds",
+            elapsed_seconds=time.time() - start, metadata=metadata,
+        )
+    except Exception as exc:
+        return result_row(
+            task_id=task_id, evaluator=evaluator, config=config, output_text="", status="failed",
+            error=f"Bedrock Converse error: {type(exc).__name__}: {exc}",
+            elapsed_seconds=time.time() - start, metadata=metadata,
+        )
 
 
 def result_row(

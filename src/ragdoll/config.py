@@ -70,6 +70,7 @@ class LocalAgentConfig:
     agent_state_dir: Path | None = None
     system_prompt: str = DEFAULT_SYSTEM_PROMPT
     temperature: float | None = None
+    max_tokens: int = 2048
     cache_dir: Path | None = None
     extension_path: Path | None = None
     extension_cwd: Path | None = None
@@ -277,6 +278,7 @@ class RunConfig(BaseConfig):
     thinking: str = DEFAULT_THINKING
     system_prompt: str = DEFAULT_SYSTEM_PROMPT
     temperature: float | None = None
+    max_tokens: int = 2048
     max_concurrency: int = DEFAULT_MAX_CONCURRENCY
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS
     agent_state_dir: Path | None = None
@@ -303,6 +305,7 @@ class RunConfig(BaseConfig):
             agent_state_dir=self.agent_state_dir,
             system_prompt=self.system_prompt,
             temperature=self.temperature,
+            max_tokens=self.max_tokens,
             cache_dir=self.cache_dir,
             extension_path=self.extension_path,
             extension_cwd=self.extension_cwd,

@@ -9,6 +9,11 @@ from ragdoll.runner import run_prompt
 from ragdoll.umbrela.prompts import parse_umbrela_judgment
 from ragdoll.umbrela.stages import iter_prompt_tasks
 
+try:
+    from tqdm import tqdm
+except ImportError:  # pragma: no cover - exercised only in minimal installs
+    tqdm = None
+
 
 async def judge(config: UmbrelaJudgeConfig) -> None:
     if config.overwrite and config.output_file.exists():
@@ -63,7 +68,28 @@ async def judge(config: UmbrelaJudgeConfig) -> None:
                 )
             return row if completed else {**row, "result_status": "failed", "error": result["error"]}
 
-    for future in asyncio.as_completed([asyncio.create_task(one(task)) for task in tasks]):
-        row = await future
-        append_jsonl(config.output_file, row)
+    futures = [asyncio.create_task(one(task)) for task in tasks]
+    progress = (
+        tqdm(
+            total=len(futures),
+            desc=f"UMBRELA {config.provider}/{config.model}",
+            unit="task",
+            dynamic_ncols=True,
+        )
+        if tqdm is not None
+        else None
+    )
+    completed = 0
+    try:
+        for future in asyncio.as_completed(futures):
+            row = await future
+            append_jsonl(config.output_file, row)
+            completed += 1
+            if progress is not None:
+                progress.update(1)
+            else:
+                print(f"processed {completed}/{len(futures)} tasks", flush=True)
+    finally:
+        if progress is not None:
+            progress.close()
     print(f"processed={len(tasks)} output={config.output_file} raw_events_dir={raw_events_dir}")

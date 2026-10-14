@@ -40,10 +40,23 @@ htmlcov/
 # Run outputs / artifacts (project-specific)
 data/*
 !data/.gitkeep
+# Generated evaluation outputs and raw events; keep source scripts and scoring code tracked.
 results/
 raw-events/
 scripts/
 tools/
+!tools/
+tools/*
+!tools/run_umbrela_bedrock.py
+!tools/create_gov_injection_umbrela.py
+!tools/create_metadata_fake_links.py
+!tools/prepare_trec_dl_umbrela.py
+!tools/run_jev_all_years.py
+!tools/run_jev_content_query_title.py
+!tools/run_jev_gender_metadata.py
+!tools/run_jev_gov_injection.py
+!tools/run_jev_link_metadata.py
+!tools/trec_dl_csv_to_umbrela.py
 *.failed.jsonl
 
 # IDE / editor
